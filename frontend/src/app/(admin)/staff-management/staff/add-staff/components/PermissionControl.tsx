@@ -189,7 +189,6 @@ const PermissionControl = ({ onNext }: PermissionControlProps) => {
         isAllowed: permissions[section.key]?.[child.key] || false,
       })),
     }));
-
     onNext(result);
   };
 

@@ -1,3 +1,5 @@
+"use client";
+
 import LogoBox from "@/components/LogoBox";
 import IconifyIcon from "@/components/wrappers/IconifyIcon";
 import SimplebarReactClient from "@/components/wrappers/SimplebarReactClient";

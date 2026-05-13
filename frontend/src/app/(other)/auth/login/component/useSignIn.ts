@@ -60,8 +60,7 @@ const useSignIn = () => {
           expires: 1,
         });
         toast.success("Login successful!");
-        // middleware will redirect to first allowed route
-        push("/auth/login");
+        push("/dashboard");
       }
     } catch (error: any) {
       toast.error(error?.data?.message || "Invalid credentials");
