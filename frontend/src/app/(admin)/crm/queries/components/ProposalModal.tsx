@@ -2,44 +2,104 @@
 
 import { Icon } from "@iconify/react/dist/iconify.js";
 import React, { useState } from "react";
-import { Button, Modal, Table, Form } from "react-bootstrap";
+import { Button, Modal, Table, Badge } from "react-bootstrap";
 import SendMessageModal from "./SendMessageModal";
-import PriceModal from "./PriceModal";
+import {
+  useGetProposalsByQueryQuery,
+  useSendProposalMutation,
+  useAcceptProposalMutation,
+  useRejectProposalMutation,
+} from "../../../../../../Redux/proposalApi";
 
-const ProposalModal = () => {
-  const [showHistory, setShowHistory] = useState(false);
+interface Props {
+  queryId: string;
+}
+
+const ProposalModal: React.FC<Props> = ({ queryId }) => {
+  const [show, setShow] = useState(false);
+
+  const {
+    data: proposalData,
+    isLoading,
+    refetch,
+  } = useGetProposalsByQueryQuery(queryId, {
+    skip: !show, // only fetch when modal is open
+  });
+
+  const [sendProposal] = useSendProposalMutation();
+  const [acceptProposal] = useAcceptProposalMutation();
+  const [rejectProposal] = useRejectProposalMutation();
+
+  const proposals = proposalData?.data ?? [];
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "NA";
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+    });
+  };
+
+  const getTimeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}H ${mins}M`;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const map: Record<string, string> = {
+      draft: "secondary",
+      sent: "primary",
+      accepted: "success",
+      rejected: "danger",
+    };
+    return map[status] ?? "secondary";
+  };
+
+  const handleSend = async (id: string) => {
+    await sendProposal(id);
+    refetch();
+  };
+
+  const handleAccept = async (id: string) => {
+    await acceptProposal(id);
+    refetch();
+  };
+
+  const handleReject = async (id: string) => {
+    await rejectProposal(id);
+    refetch();
+  };
+
   return (
     <>
-      {/* BUTTON */}
+      {/* Trigger Button */}
       <Button
         size="sm"
-        onClick={() => setShowHistory(true)}
-        style={{ fontSize: "10px" }}
         variant="link"
+        style={{ fontSize: "10px", padding: 0 }}
+        onClick={() => setShow(true)}
       >
-        1 (View Proposal)
+        {proposals.length > 0
+          ? `${proposals.length} (View Proposal)`
+          : "View Proposals"}
       </Button>
 
-      {/* ================= HISTORY MODAL ================= */}
-      <Modal
-        show={showHistory}
-        onHide={() => setShowHistory(false)}
-        size="xl"
-        centered
-      >
+      {/* Modal */}
+      <Modal show={show} onHide={() => setShow(false)} size="xl" centered>
         <Modal.Header
           style={{
             background: "#274c6b",
             color: "#fff",
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
           }}
         >
-          <Modal.Title>view Proposal</Modal.Title>
-
+          <Modal.Title style={{ fontSize: "16px" }}>View Proposals</Modal.Title>
           <button
-            onClick={() => setShowHistory(false)}
+            onClick={() => setShow(false)}
             style={{
               background: "transparent",
               border: "none",
@@ -53,80 +113,152 @@ const ProposalModal = () => {
         </Modal.Header>
 
         <Modal.Body>
-          <Table bordered hover>
-            <thead style={{ fontSize: "10px" }}>
-              <tr>
-                <th>Proposal Date/Age</th>
-                <th>Proposal ID</th>
-                <th>Travel Date</th>
-                <th> Type</th>
-                <th> No. of Pax</th>
-                <th> Destinations</th>
-                <th> Offer Price</th>
-                <th> Stage</th>
-                <th> Owner</th>
-                <th> Last Updated</th>
-                <th> Action</th>
-              </tr>
-            </thead>
-            <tbody style={{ fontSize: "10px" }}>
-              <tr>
-                <td>
-                  <div>17-Mar-26</div>
-                  <div>10H 29M</div>
-                </td>
-                <td>
-                  <div>QS/26/2113160/V1</div>
-                  <div>Q:2047192</div>
-                </td>
-                <td>
-                  <div>12-May-26 -</div>
-                  <div>16-May-26</div>
-                </td>
-                <td>
-                  <div>Quick Package Supplier</div>
-                </td>
-                <td>10 Adult(s)</td>
-                <td>Pattaya</td>
-                <td>
-                  <div> INR 514030</div>
-                  <div>
-                    <PriceModal />
-                  </div>
-                </td>
-                <td>
-                  <div> Proposal Sent</div>
-                  <div>Changes | Create EMI</div>
-                </td>
-                <td>
-                  <div> RAJENDRA</div>
-                  <div>(DIRECTOR)</div>
-                </td>
-                <td>
-                  <div> 17-Mar-26</div>
-                  <div>Delivered</div>
-                </td>
-                <td>
-                  <div className="d-flex flex-column gap-1">
-                    <span className="action-btn view">
-                      <Button
-                        variant="success"
-                        size="sm"
-                        style={{ fontSize: "10px" }}
-                        title="View"
-                      >
-                        <Icon icon="mdi:eye-outline" />
-                      </Button>
-                    </span>
+          {isLoading ? (
+            <div className="text-center py-4">
+              <div className="spinner-border spinner-border-sm text-primary" />
+            </div>
+          ) : proposals.length === 0 ? (
+            <p
+              className="text-center text-muted py-4"
+              style={{ fontSize: "12px" }}
+            >
+              No proposals yet for this query.
+            </p>
+          ) : (
+            <Table bordered hover style={{ fontSize: "10px" }}>
+              <thead>
+                <tr>
+                  <th>Proposal Date / Age</th>
+                  <th>Proposal ID</th>
+                  <th>Travel Details</th>
+                  <th>Type</th>
+                  <th>No. of Pax</th>
+                  <th>Destinations</th>
+                  <th>Offer Price</th>
+                  <th>Stage</th>
+                  <th>Last Updated</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {proposals.map((proposal) => (
+                  <tr key={proposal._id}>
+                    {/* Date */}
+                    <td>
+                      <div>{formatDate(proposal.createdAt)}</div>
+                      <div className="text-muted">
+                        {getTimeAgo(proposal.createdAt)}
+                      </div>
+                    </td>
 
-                    <span className="action-btn chat">
-                      <SendMessageModal />
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </Table>
+                    {/* Proposal ID */}
+                    <td>
+                      <div>{proposal._id.slice(-8).toUpperCase()}</div>
+                      <div className="text-muted">Q:{queryId.slice(-7)}</div>
+                    </td>
+
+                    {/* Travel Details */}
+                    <td>
+                      <div>{formatDate(proposal.createdAt)}</div>
+                    </td>
+
+                    {/* Type */}
+                    <td>{proposal.packageDetails?.notes ?? "Package"}</td>
+
+                    {/* Pax */}
+                    <td>{proposal.leadId?.customerName ?? "NA"}</td>
+
+                    {/* Destinations */}
+                    <td>
+                      {proposal.packageDetails?.hotels?.join(", ") ?? "NA"}
+                    </td>
+
+                    {/* Price */}
+                    <td>
+                      <div>INR {proposal.totalPrice?.toLocaleString()}</div>
+                      <div className="text-muted" style={{ fontSize: "9px" }}>
+                        Base: {proposal.basePrice?.toLocaleString()}
+                        {proposal.markup > 0 && ` + ${proposal.markup} markup`}
+                      </div>
+                    </td>
+
+                    {/* Stage */}
+                    <td>
+                      <Badge
+                        bg={getStatusBadge(proposal.status)}
+                        style={{ fontSize: "9px" }}
+                      >
+                        {proposal.status.charAt(0).toUpperCase() +
+                          proposal.status.slice(1)}
+                      </Badge>
+                      {proposal.sentAt && (
+                        <div className="text-muted" style={{ fontSize: "9px" }}>
+                          Sent: {formatDate(proposal.sentAt)}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Last Updated */}
+                    <td>{formatDate(proposal.createdAt)}</td>
+
+                    {/* Actions */}
+                    <td>
+                      <div className="d-flex flex-column gap-1">
+                        {/* Send */}
+                        {proposal.status === "draft" && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            style={{ fontSize: "9px" }}
+                            onClick={() => handleSend(proposal._id)}
+                          >
+                            Send
+                          </Button>
+                        )}
+
+                        {/* Accept */}
+                        {proposal.status === "sent" && (
+                          <Button
+                            variant="success"
+                            size="sm"
+                            style={{ fontSize: "9px" }}
+                            onClick={() => handleAccept(proposal._id)}
+                          >
+                            Accept
+                          </Button>
+                        )}
+
+                        {/* Reject */}
+                        {(proposal.status === "sent" ||
+                          proposal.status === "draft") && (
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            style={{ fontSize: "9px" }}
+                            onClick={() => handleReject(proposal._id)}
+                          >
+                            Reject
+                          </Button>
+                        )}
+
+                        {/* View */}
+                        <Button
+                          variant="success"
+                          size="sm"
+                          style={{ fontSize: "9px" }}
+                          title="View"
+                        >
+                          <Icon icon="mdi:eye-outline" />
+                        </Button>
+
+                        <SendMessageModal />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
         </Modal.Body>
       </Modal>
     </>

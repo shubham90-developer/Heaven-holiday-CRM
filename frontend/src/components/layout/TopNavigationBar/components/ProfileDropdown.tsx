@@ -68,7 +68,25 @@ const ProfileDropdown = () => {
               icon="tabler:logout"
               className="me-1 fs-17 align-middle"
             />
-            <span className="align-middle">Sign Out</span>
+            <span
+              className="align-middle"
+              onClick={() => {
+                document.cookie.split(";").forEach((cookie) => {
+                  document.cookie = cookie
+                    .replace(/^ +/, "")
+                    .replace(
+                      /=.*/,
+                      "=;expires=" + new Date(0).toUTCString() + ";path=/",
+                    );
+                });
+
+                localStorage.clear();
+
+                window.location.href = "/auth/login";
+              }}
+            >
+              Sign Out
+            </span>
           </DropdownItem>
         </DropdownMenu>
       </Dropdown>

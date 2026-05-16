@@ -10,6 +10,7 @@ import {
   useSuperadminLoginMutation,
   useStaffLoginMutation,
 } from "../../../../../../Redux/authApi";
+import { getFirstAllowedRoute } from "@/helpers/Manu";
 
 const useSignIn = () => {
   const [loading, setLoading] = useState(false);
@@ -48,19 +49,37 @@ const useSignIn = () => {
 
         Cookies.set("token", res.token, { expires: 1 });
         toast.success("Welcome Superadmin!");
-        push("/dashboard");
+        push("/dashboard"); // Superadmin always goes to dashboard
       } else {
         const res = await staffLogin({
           email: values.email,
           password: values.password,
         }).unwrap();
 
+        // Set both cookies before computing the redirect
         Cookies.set("token", res.token, { expires: 1 });
         Cookies.set("permissions", JSON.stringify(res.permissions), {
           expires: 1,
         });
+
+        // FIX 4: Was: push("/dashboard") — hardcoded, ignores staff permissions.
+        // Staff may not have dashboard access. Always redirect to their first
+        // allowed route instead.
+        const firstAllowedRoute = getFirstAllowedRoute(res.permissions || []);
+
+        if (!firstAllowedRoute) {
+          // Staff has no allowed routes at all — inform and don't navigate
+          toast.error(
+            "Your account has no active permissions. Contact your admin.",
+          );
+          // Clear cookies since there's nowhere valid to go
+          Cookies.remove("token");
+          Cookies.remove("permissions");
+          return;
+        }
+
         toast.success("Login successful!");
-        push("/dashboard");
+        push(firstAllowedRoute);
       }
     } catch (error: any) {
       toast.error(error?.data?.message || "Invalid credentials");
