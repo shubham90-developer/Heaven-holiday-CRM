@@ -5,18 +5,19 @@ import { Button, Card, Col, Form, Row } from "react-bootstrap";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { useGetAllQueriesQuery } from "../../../../../../Redux/queryApi";
 import { useRouter } from "next/navigation";
-
+import ProposalModal from "../../queries/components/ProposalModal";
+import SendMessageModal from "../../leads/components/SendMessageModal";
 const ConfirmedQueries = () => {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const { data: queriesData, isLoading } = useGetAllQueriesQuery({
     stage: "confirmed",
     page,
     limit: 20,
   });
-
   const queries = queriesData?.data ?? [];
 
   const formatDate = (dateStr?: string) => {
@@ -45,6 +46,16 @@ const ConfirmedQueries = () => {
           q.goingTo?.toLowerCase().includes(search.toLowerCase()),
       )
     : queries;
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+
+  const toggleSelectAll = () =>
+    setSelectedIds(
+      selectedIds.length === filtered.length ? [] : filtered.map((q) => q._id),
+    );
 
   return (
     <>
@@ -86,7 +97,14 @@ const ConfirmedQueries = () => {
               <thead>
                 <tr style={{ fontSize: "10px", whiteSpace: "nowrap" }}>
                   <th style={{ width: "40px" }}>
-                    <Form.Check type="checkbox" />
+                    <Form.Check
+                      type="checkbox"
+                      checked={
+                        filtered.length > 0 &&
+                        selectedIds.length === filtered.length
+                      }
+                      onChange={toggleSelectAll}
+                    />
                   </th>
                   <th style={{ width: "130px" }}>Query Date</th>
                   <th style={{ width: "260px" }}>Customer Details</th>
@@ -103,7 +121,6 @@ const ConfirmedQueries = () => {
                   </th>
                 </tr>
               </thead>
-
               <tbody style={{ fontSize: "12px" }}>
                 {filtered.length === 0 ? (
                   <tr>
@@ -115,21 +132,24 @@ const ConfirmedQueries = () => {
                   filtered.map((query) => (
                     <tr key={query._id}>
                       <td>
-                        <Form.Check type="checkbox" />
+                        <Form.Check
+                          type="checkbox"
+                          checked={selectedIds.includes(query._id)}
+                          onChange={() => toggleSelect(query._id)}
+                        />
                       </td>
-
-                      {/* Query Date */}
                       <td>
                         <div>{formatDate(query.createdAt)}</div>
-                        <div className="text-muted">
+                        <div
+                          className="text-muted"
+                          style={{ fontSize: "10px" }}
+                        >
                           {getTimeAgo(query.createdAt)}
                         </div>
                         <div style={{ fontSize: "9px", color: "#666" }}>
                           {query.queryNumber}
                         </div>
                       </td>
-
-                      {/* Customer Details */}
                       <td>
                         {query.leadId?.customerName && (
                           <div className="fw-semibold">
@@ -150,8 +170,6 @@ const ConfirmedQueries = () => {
                           </div>
                         )}
                       </td>
-
-                      {/* Pax / Type */}
                       <td>
                         <div>{query.travelers} Traveler(s)</div>
                         <span
@@ -160,50 +178,29 @@ const ConfirmedQueries = () => {
                           {query.leadId?.type ?? "B2C"}
                         </span>
                       </td>
-
-                      {/* Description */}
                       <td>
                         <div>{query.requirementType}</div>
                         <div style={{ fontSize: "10px", color: "#666" }}>
                           {query.queryType}
                         </div>
                       </td>
-
-                      {/* Travel Date */}
                       <td>{formatDate(query.travelDate)}</td>
-
-                      {/* Destinations */}
                       <td>
-                        {query.goingFrom && `${query.goingFrom} → `}
+                        {query.goingFrom ? `${query.goingFrom} → ` : ""}
                         {query.goingTo}
                       </td>
-
-                      {/* Proposal */}
                       <td>
-                        <span
-                          className="text-muted"
-                          style={{ fontSize: "10px" }}
-                        >
-                          View Proposals
-                        </span>
+                        <ProposalModal queryId={query._id} />
                       </td>
-
-                      {/* Lead Stage */}
                       <td>
                         <span className="badge bg-success">Confirmed</span>
                       </td>
-
-                      {/* Last Updated */}
                       <td>{formatDate(query.updatedAt)}</td>
-
-                      {/* Owner */}
                       <td>
                         {query.assignedSales
                           ? `${query.assignedSales.firstName} ${query.assignedSales.lastName}`
                           : "Unassigned"}
                       </td>
-
-                      {/* Action */}
                       <td>
                         <div className="d-flex flex-column gap-1">
                           <Button
@@ -217,6 +214,7 @@ const ConfirmedQueries = () => {
                           >
                             <Icon icon="mdi:eye-outline" />
                           </Button>
+                          <SendMessageModal />
                         </div>
                       </td>
                     </tr>
@@ -227,7 +225,6 @@ const ConfirmedQueries = () => {
           </div>
         )}
 
-        {/* Load More */}
         {queriesData?.pagination &&
           queries.length < queriesData.pagination.total && (
             <div className="d-flex justify-content-center mt-4">

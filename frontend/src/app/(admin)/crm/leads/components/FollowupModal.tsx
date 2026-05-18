@@ -1,32 +1,28 @@
 "use client";
 
 import React, { useState } from "react";
-import { Button, Modal, Form } from "react-bootstrap";
+import { Button, Modal, Table, Form, Spinner } from "react-bootstrap";
 import {
   useCreateFollowUpMutation,
-  useMarkCompleteMutation,
+  useGetFollowUpsByLeadQuery,
 } from "../../../../../../Redux/followUpApi";
-
 import { useGetAllStaffQuery } from "../../../../../../Redux/staffApi";
 
 interface Props {
   leadId: string;
-  customerName: string;
-  customerType: "B2C" | "B2B";
   queryId?: string;
-  onTemperatureChange?: (temp: string) => void;
+  customerId: string;
+  customerType: "B2C" | "B2B";
 }
 
 const FollowupModal: React.FC<Props> = ({
   leadId,
-  customerName,
-  customerType,
   queryId,
-  onTemperatureChange,
+  customerId,
+  customerType,
 }) => {
   const [showAdd, setShowAdd] = useState(false);
-
-  // Form state
+  const [showHistory, setShowHistory] = useState(false);
   const [type, setType] = useState<"call" | "todo">("call");
   const [direction, setDirection] = useState<"outgoing" | "incoming">(
     "outgoing",
@@ -45,30 +41,53 @@ const FollowupModal: React.FC<Props> = ({
   const [assignedTo, setAssignedTo] = useState("");
   const [details, setDetails] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
-  const [temperature, setTemperature] = useState("");
-  const [error, setError] = useState("");
+  const [temperature, setTemperature] = useState<"" | "hot" | "warm" | "cold">(
+    "",
+  );
 
-  // API
+  const [createFollowUp, { isLoading: saving }] = useCreateFollowUpMutation();
   const { data: staffData } = useGetAllStaffQuery({ archived: false });
-  const [createFollowUp, { isLoading }] = useCreateFollowUpMutation();
+  const { data: historyData, isLoading: historyLoading } =
+    useGetFollowUpsByLeadQuery(leadId, {
+      skip: !showHistory || !leadId,
+    });
 
   const staffList = staffData?.data ?? [];
+  const history = historyData?.data ?? [];
 
-  const getFollowUpDate = (): string => {
+  const gv = (v: string, s: string) =>
+    v === s ? "primary" : "outline-secondary";
+
+  const getFollowUpDate = () => {
     const d = new Date();
-    if (dateType === "tomorrow") d.setDate(d.getDate() + 1);
-    if (dateType === "2days") d.setDate(d.getDate() + 2);
-    if (dateType === "3days") d.setDate(d.getDate() + 3);
-    if (dateType === "custom") return customDate || d.toISOString();
-    return d.toISOString();
+    if (dateType === "today") return d.toISOString().split("T")[0];
+    if (dateType === "tomorrow") {
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().split("T")[0];
+    }
+    if (dateType === "2days") {
+      d.setDate(d.getDate() + 2);
+      return d.toISOString().split("T")[0];
+    }
+    if (dateType === "3days") {
+      d.setDate(d.getDate() + 3);
+      return d.toISOString().split("T")[0];
+    }
+    return customDate;
   };
 
-  const handleSubmit = async () => {
-    if (!assignedTo) {
-      setError("Please select assigned staff.");
-      return;
-    }
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+    });
 
+  const handleSubmit = async () => {
+    if (!assignedTo) return alert("Please select Assigned To.");
+    if (!time) return alert("Please enter a time.");
+    const followUpDate = getFollowUpDate();
+    if (!followUpDate) return alert("Please pick a date.");
     try {
       await createFollowUp({
         leadId,
@@ -77,30 +96,23 @@ const FollowupModal: React.FC<Props> = ({
         direction: type === "call" ? direction : undefined,
         outcome: type === "call" ? outcome : undefined,
         nextAction: action,
-        followUpDate: getFollowUpDate(),
-        followUpTime: time || "10:00",
+        followUpDate,
+        followUpTime: time,
         remindBefore: 15,
         assignedTo,
-        customerId: leadId,
+        customerId,
         customerType,
         details,
         isCompleted,
       }).unwrap();
-
-      // update temperature on parent if changed
-      if (temperature && onTemperatureChange) {
-        onTemperatureChange(temperature);
-      }
-
       setShowAdd(false);
-      setError("");
-    } catch (err: any) {
-      setError(err?.data?.message || "Failed to save follow up.");
+      setDetails("");
+      setTime("");
+      setIsCompleted(false);
+    } catch {
+      alert("Failed to save follow-up.");
     }
   };
-
-  const getVariant = (value: string, selected: string) =>
-    value === selected ? "primary" : "outline-secondary";
 
   return (
     <>
@@ -112,6 +124,7 @@ const FollowupModal: React.FC<Props> = ({
         Follow Up
       </Button>
 
+      {/* ADD MODAL */}
       <Modal show={showAdd} onHide={() => setShowAdd(false)} size="md" centered>
         <Modal.Header
           style={{
@@ -121,7 +134,7 @@ const FollowupModal: React.FC<Props> = ({
             justifyContent: "space-between",
           }}
         >
-          <Modal.Title style={{ fontSize: "15px" }}>
+          <Modal.Title style={{ fontSize: "14px" }}>
             Add To Do / Follow Up
           </Modal.Title>
           <button
@@ -137,52 +150,52 @@ const FollowupModal: React.FC<Props> = ({
             ✕
           </button>
         </Modal.Header>
-
         <Modal.Body>
-          {error && (
-            <div
-              className="alert alert-danger py-1 mb-2"
-              style={{ fontSize: "11px" }}
-            >
-              {error}
-            </div>
-          )}
-
-          {/* TYPE */}
+          {/* Type */}
           <div className="mb-2">
-            {(["call", "todo"] as const).map((t) => (
+            <Button
+              size="sm"
+              variant={gv("call", type)}
+              onClick={() => setType("call")}
+              className="me-2"
+              style={{ fontSize: "10px" }}
+            >
+              Call
+            </Button>
+            <Button
+              size="sm"
+              variant={gv("todo", type)}
+              onClick={() => setType("todo")}
+              style={{ fontSize: "10px" }}
+            >
+              To Do
+            </Button>
+          </div>
+
+          {/* Direction */}
+          {type === "call" && (
+            <div className="mb-2">
               <Button
-                key={t}
                 size="sm"
-                variant={getVariant(t, type)}
-                onClick={() => setType(t)}
+                variant={gv("outgoing", direction)}
+                onClick={() => setDirection("outgoing")}
                 className="me-2"
                 style={{ fontSize: "10px" }}
               >
-                {t === "call" ? "Call" : "To Do"}
+                Outgoing
               </Button>
-            ))}
-          </div>
-
-          {/* DIRECTION */}
-          {type === "call" && (
-            <div className="mb-2">
-              {(["outgoing", "incoming"] as const).map((d) => (
-                <Button
-                  key={d}
-                  size="sm"
-                  variant={getVariant(d, direction)}
-                  onClick={() => setDirection(d)}
-                  className="me-2"
-                  style={{ fontSize: "10px" }}
-                >
-                  {d.charAt(0).toUpperCase() + d.slice(1)}
-                </Button>
-              ))}
+              <Button
+                size="sm"
+                variant={gv("incoming", direction)}
+                onClick={() => setDirection("incoming")}
+                style={{ fontSize: "10px" }}
+              >
+                Incoming
+              </Button>
             </div>
           )}
 
-          {/* OUTCOME */}
+          {/* Outcome */}
           {type === "call" && (
             <>
               <h6 className="text-primary mt-2" style={{ fontSize: "11px" }}>
@@ -191,70 +204,70 @@ const FollowupModal: React.FC<Props> = ({
               <div className="mb-2">
                 {(
                   [
-                    { val: "answered", label: "Answered" },
-                    { val: "unanswered", label: "Unanswered" },
-                    { val: "notReachable", label: "Not Reachable" },
+                    { value: "answered", label: "Answered" },
+                    { value: "unanswered", label: "Unanswered" },
+                    { value: "notReachable", label: "Not Reachable" },
                   ] as const
-                ).map(({ val, label }) => (
+                ).map((o) => (
                   <Button
-                    key={val}
+                    key={o.value}
                     size="sm"
-                    variant={getVariant(val, outcome)}
-                    onClick={() => setOutcome(val)}
+                    variant={gv(o.value, outcome)}
+                    onClick={() => setOutcome(o.value)}
                     className="me-2"
                     style={{ fontSize: "10px" }}
                   >
-                    {label}
+                    {o.label}
                   </Button>
                 ))}
               </div>
             </>
           )}
 
-          {/* NEXT ACTION */}
+          {/* Action */}
           <div className="mb-2">
             {(
               [
-                { val: "callBack", label: "Call Back" },
-                { val: "todo", label: "To Do" },
-                { val: "meeting", label: "Meeting" },
-                { val: "createQuery", label: "Create Query" },
-                { val: "lost", label: "Lost" },
+                { value: "callBack", label: "Call Back" },
+                { value: "todo", label: "To Do" },
+                { value: "meeting", label: "Meeting" },
+                { value: "createQuery", label: "Create Query" },
+                { value: "lost", label: "Lost" },
               ] as const
-            ).map(({ val, label }) => (
+            ).map((a) => (
               <Button
-                key={val}
+                key={a.value}
                 size="sm"
-                variant={getVariant(val, action)}
-                onClick={() => setAction(val)}
+                variant={gv(a.value, action)}
+                onClick={() => setAction(a.value)}
                 className="me-2 mb-1"
                 style={{ fontSize: "10px" }}
               >
-                {label}
+                {a.label}
               </Button>
             ))}
           </div>
 
-          {/* DATE */}
+          {/* Date quick select */}
           <div className="mb-2">
             {(
               [
-                { val: "today", label: "Today" },
-                { val: "tomorrow", label: "Tomorrow" },
-                { val: "2days", label: "In 2 Days" },
-                { val: "3days", label: "In 3 Days" },
-                { val: "custom", label: "Custom" },
+                { value: "today", label: "Today" },
+                { value: "tomorrow", label: "Tomorrow" },
+                { value: "2days", label: "In 2 Days" },
+                { value: "3days", label: "In 3 Days" },
+                { value: "custom", label: "Custom" },
               ] as const
-            ).map(({ val, label }) => (
+            ).map((d) => (
               <Button
-                key={val}
+                key={d.value}
                 size="sm"
-                variant={getVariant(val, dateType)}
-                onClick={() => setDateType(val)}
+                variant={gv(d.value, dateType)}
+                onClick={() => setDateType(d.value)}
                 className="me-2 mb-1"
                 style={{ fontSize: "10px" }}
               >
-                {label}
+                {d.label}
               </Button>
             ))}
           </div>
@@ -266,9 +279,9 @@ const FollowupModal: React.FC<Props> = ({
               </Form.Label>
               <Form.Control
                 type="date"
-                size="sm"
                 value={customDate}
                 onChange={(e) => setCustomDate(e.target.value)}
+                style={{ fontSize: "10px" }}
               />
             </Form.Group>
           )}
@@ -276,49 +289,32 @@ const FollowupModal: React.FC<Props> = ({
           <Form>
             <Form.Group className="mb-2">
               <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
-                Time
+                Time *
               </Form.Label>
               <Form.Control
                 type="time"
-                size="sm"
-                style={{ fontSize: "10px" }}
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
+                style={{ fontSize: "10px" }}
               />
             </Form.Group>
-
             <Form.Group className="mb-2">
               <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
                 Assigned To *
               </Form.Label>
               <Form.Select
-                size="sm"
-                style={{ fontSize: "10px" }}
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
+                style={{ fontSize: "10px" }}
               >
                 <option value="">Select Staff</option>
-                {staffList.map((s: any) => (
+                {staffList.map((s) => (
                   <option key={s._id} value={s._id}>
                     {s.firstName} {s.lastName}
                   </option>
                 ))}
               </Form.Select>
             </Form.Group>
-
-            <Form.Group className="mb-2">
-              <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
-                Customer
-              </Form.Label>
-              <Form.Control
-                type="text"
-                size="sm"
-                style={{ fontSize: "10px" }}
-                value={customerName}
-                disabled
-              />
-            </Form.Group>
-
             <Form.Group className="mb-3">
               <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
                 Details
@@ -326,43 +322,56 @@ const FollowupModal: React.FC<Props> = ({
               <Form.Control
                 as="textarea"
                 rows={3}
-                style={{ fontSize: "10px" }}
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
+                style={{ fontSize: "10px" }}
               />
             </Form.Group>
-
             <Form.Check
               type="checkbox"
               label="Completed"
-              style={{ fontSize: "10px" }}
               checked={isCompleted}
               onChange={(e) => setIsCompleted(e.target.checked)}
+              style={{ fontSize: "10px" }}
             />
-
-            {/* Temperature */}
             <div className="mt-3 d-flex gap-3">
-              {[
-                { val: "", label: "No Status" },
-                { val: "hot", label: "Hot" },
-                { val: "warm", label: "Warm" },
-                { val: "cold", label: "Cold" },
-              ].map(({ val, label }) => (
+              {(
+                [
+                  { value: "", label: "No Status" },
+                  { value: "hot", label: "Hot" },
+                  { value: "warm", label: "Warm" },
+                  { value: "cold", label: "Cold" },
+                ] as const
+              ).map((t) => (
                 <Form.Check
-                  key={label}
+                  key={t.value}
                   type="radio"
-                  name="temperature"
-                  label={label}
-                  value={val}
-                  checked={temperature === val}
-                  onChange={(e) => setTemperature(e.target.value)}
+                  name="leadStatus"
+                  label={t.label}
+                  value={t.value}
+                  checked={temperature === t.value}
+                  onChange={(e) =>
+                    setTemperature(e.target.value as typeof temperature)
+                  }
                   style={{ fontSize: "10px" }}
                 />
               ))}
             </div>
           </Form>
+          <div className="mt-3">
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              style={{ fontSize: "10px" }}
+              onClick={() => {
+                setShowAdd(false);
+                setShowHistory(true);
+              }}
+            >
+              View History
+            </Button>
+          </div>
         </Modal.Body>
-
         <Modal.Footer>
           <Button
             variant="secondary"
@@ -375,9 +384,120 @@ const FollowupModal: React.FC<Props> = ({
             variant="primary"
             style={{ fontSize: "10px" }}
             onClick={handleSubmit}
-            disabled={isLoading}
+            disabled={saving}
           >
-            {isLoading ? "Saving..." : "Submit"}
+            {saving ? <Spinner size="sm" animation="border" /> : "Submit"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* HISTORY MODAL */}
+      <Modal
+        show={showHistory}
+        onHide={() => setShowHistory(false)}
+        size="xl"
+        centered
+      >
+        <Modal.Header
+          style={{
+            background: "#274c6b",
+            color: "#fff",
+            display: "flex",
+            justifyContent: "space-between",
+          }}
+        >
+          <Modal.Title style={{ fontSize: "14px" }}>
+            Follow Up History
+          </Modal.Title>
+          <button
+            onClick={() => setShowHistory(false)}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#fff",
+              fontSize: "18px",
+              cursor: "pointer",
+            }}
+          >
+            ✕
+          </button>
+        </Modal.Header>
+        <Modal.Body>
+          {historyLoading ? (
+            <div className="text-center py-3">
+              <Spinner size="sm" animation="border" />
+            </div>
+          ) : history.length === 0 ? (
+            <p
+              className="text-center text-muted py-3"
+              style={{ fontSize: "12px" }}
+            >
+              No follow-up history found.
+            </p>
+          ) : (
+            <Table bordered hover style={{ fontSize: "10px" }}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Direction</th>
+                  <th>Outcome</th>
+                  <th>Next Action</th>
+                  <th>Assigned To</th>
+                  <th>Details</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((f, idx) => (
+                  <tr key={f._id}>
+                    <td>{idx + 1}</td>
+                    <td>
+                      {formatDate(f.followUpDate)} {f.followUpTime}
+                    </td>
+                    <td className="text-capitalize">{f.activityType}</td>
+                    <td className="text-capitalize">{f.direction ?? "-"}</td>
+                    <td className="text-capitalize">{f.outcome ?? "-"}</td>
+                    <td className="text-capitalize">{f.nextAction ?? "-"}</td>
+                    <td>
+                      {f.assignedTo
+                        ? `${f.assignedTo.firstName} ${f.assignedTo.lastName}`
+                        : "-"}
+                    </td>
+                    <td>{f.details ?? "-"}</td>
+                    <td>
+                      <span
+                        className={`badge ${f.isCompleted ? "bg-success" : "bg-warning text-dark"}`}
+                      >
+                        {f.isCompleted ? "Done" : "Pending"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-primary"
+            size="sm"
+            style={{ fontSize: "10px" }}
+            onClick={() => {
+              setShowHistory(false);
+              setShowAdd(true);
+            }}
+          >
+            + Add New
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            style={{ fontSize: "10px" }}
+            onClick={() => setShowHistory(false)}
+          >
+            Close
           </Button>
         </Modal.Footer>
       </Modal>
