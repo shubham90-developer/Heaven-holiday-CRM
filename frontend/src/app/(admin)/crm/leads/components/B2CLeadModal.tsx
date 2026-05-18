@@ -2,57 +2,57 @@
 
 import { Icon } from "@iconify/react";
 import React, { useState } from "react";
-import {
-  Button,
-  Modal,
-  Form,
-  Row,
-  Col,
-  InputGroup,
-  Spinner,
-} from "react-bootstrap";
+import { Button, Modal, Form, Row, Col, InputGroup } from "react-bootstrap";
 import { useCreateLeadMutation } from "../../../../../../Redux/leadApi";
 
 const leadSources = [
-  "Agency",
-  "Website",
-  "Facebook",
-  "Tripsgateway",
-  "Website B2B",
-  "Proposal",
-  "GTX Network",
-  "GTX Network Web",
-  "Instagram",
-  "Old Customer",
-  "Reference",
-  "Walk-in",
-  "RAJ SIR",
-  "My Old Client",
-  "Raj Sir Facebook",
-  "PUNE EXPO",
-  "PRANAV SIR",
-  "PRAJWAL SIR",
-  "SANKET SIR",
-  "SAIPRASAD SIR",
-  "JUST DIAL",
-  "KASTURI GROUP",
-  "Pune Expo Jan 2026",
-  "Expo Belavagi",
-  "Expo Kolhapur",
-  "Expo Sangli",
-  "Sangli Agri Pandhari",
+  { value: "4513", label: "Agency" },
+  { value: "4514", label: "Website" },
+  { value: "4515", label: "Facebook" },
+  { value: "4516", label: "Tripsgateway" },
+  { value: "4517", label: "Website B2B" },
+  { value: "4518", label: "Proposal" },
+  { value: "4519", label: "GTX Network" },
+  { value: "4520", label: "GTX Network Web" },
+  { value: "6888", label: "Instagram" },
+  { value: "8412", label: "Old Customer" },
+  { value: "8413", label: "Reference" },
+  { value: "8414", label: "Walk-in" },
+  { value: "8569", label: "RAJ SIR" },
+  { value: "8570", label: "My Old Client" },
+  { value: "8571", label: "Raj Sir Facebook" },
+  { value: "8572", label: "3700" },
+  { value: "8573", label: "AHH" },
+  { value: "9102", label: "Expo Belavagi" },
+  { value: "9116", label: "Expo Kolhapur" },
+  { value: "9117", label: "Expo Sangli" },
+  { value: "9288", label: "PUNE EXPO" },
+  { value: "9345", label: "PRANAV SIR" },
+  { value: "9346", label: "PRAJWAL SIR" },
+  { value: "9347", label: "SANKET SIR" },
+  { value: "9348", label: "SAIPRASAD SIR" },
+  { value: "9349", label: "JUST DIAL" },
+  { value: "9813", label: "KASTURI GROUP" },
+  { value: "9817", label: "Pune Expo Jan 2026" },
+  { value: "9917", label: "Varsha Bugade" },
+  { value: "9940", label: "PRANEETA BUGADE" },
+  { value: "9954", label: "Sangli Agri Pandhari" },
 ];
 
-const B2CLeadModal: React.FC = () => {
-  const [show, setShow] = useState(false);
-  const [salutation, setSalutation] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [leadSource, setLeadSource] = useState("");
-  const [leadStage, setLeadStage] = useState("");
-  const [error, setError] = useState("");
+interface Props {
+  onSuccess?: () => void;
+}
+
+const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
+  const [show, setShow] = useState<boolean>(false);
+  const [leadSource, setLeadSource] = useState<string>("");
+  const [leadStage, setLeadStage] = useState<string>("");
+  const [salutation, setSalutation] = useState<string>("");
+  const [firstName, setFirstName] = useState<string>("");
+  const [lastName, setLastName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+  const [error, setError] = useState<string>("");
 
   const [createLead, { isLoading }] = useCreateLeadMutation();
 
@@ -69,30 +69,30 @@ const B2CLeadModal: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    setError("");
-    if (!phone.trim()) return setError("Mobile number is required.");
-    if (!firstName.trim()) return setError("First name is required.");
-    const customerName = [salutation, firstName, lastName]
-      .filter(Boolean)
-      .join(" ");
+    if (!firstName || !phone) {
+      setError("First Name and Mobile Number are required.");
+      return;
+    }
     try {
       await createLead({
-        customerName,
-        phone: phone.trim(),
-        email: email.trim() || undefined,
+        customerName: `${salutation} ${firstName} ${lastName}`.trim(),
+        email: email || undefined,
+        phone,
         type: "B2C",
-        source: leadSource || "Website",
+        source: leadSource || "Direct",
         leadStage: (leadStage as any) || "new",
-        status: "inProcess",
+        status: "unassigned",
       }).unwrap();
       handleClose();
-    } catch {
-      setError("Failed to create lead. Please try again.");
+      onSuccess?.();
+    } catch (err: any) {
+      setError(err?.data?.message || "Failed to create lead.");
     }
   };
 
   return (
     <>
+      {/* BUTTON */}
       <Button
         variant="outline-danger"
         size="sm"
@@ -103,12 +103,14 @@ const B2CLeadModal: React.FC = () => {
         B2C Customer
       </Button>
 
+      {/* MODAL */}
       <Modal show={show} onHide={handleClose} centered>
+        {/* Header */}
         <Modal.Header
           style={{ background: "#274c6b", color: "#fff" }}
           className="d-flex justify-content-between"
         >
-          <Modal.Title style={{ fontSize: "14px" }}>Add B2C Lead</Modal.Title>
+          <Modal.Title>Add Lead</Modal.Title>
           <button
             onClick={handleClose}
             style={{
@@ -122,17 +124,20 @@ const B2CLeadModal: React.FC = () => {
             ✕
           </button>
         </Modal.Header>
+
+        {/* BODY */}
         <Modal.Body>
           {error && (
             <div
-              className="alert alert-danger py-1 px-2 mb-2"
-              style={{ fontSize: "10px" }}
+              className="alert alert-danger py-1"
+              style={{ fontSize: "11px" }}
             >
               {error}
             </div>
           )}
           <Form>
             <Row className="g-1">
+              {/* Email */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
@@ -144,12 +149,14 @@ const B2CLeadModal: React.FC = () => {
                   <Form.Control
                     type="email"
                     size="sm"
+                    style={{ fontSize: "10px", padding: "8px" }}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    style={{ fontSize: "10px", padding: "8px" }}
                   />
                 </Form.Group>
               </Col>
+
+              {/* Mobile */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
@@ -158,18 +165,19 @@ const B2CLeadModal: React.FC = () => {
                   >
                     Mobile Number *
                   </Form.Label>
-                  <InputGroup size="sm">
+                  <InputGroup size="sm" style={{ fontSize: "10px" }}>
                     <InputGroup.Text>🇮🇳 +91</InputGroup.Text>
                     <Form.Control
                       type="text"
+                      style={{ fontSize: "10px", padding: "8px" }}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      style={{ fontSize: "10px", padding: "8px" }}
-                      maxLength={10}
                     />
                   </InputGroup>
                 </Form.Group>
               </Col>
+
+              {/* Salutation + First Name */}
               <Col md={4}>
                 <Form.Group>
                   <Form.Label
@@ -180,17 +188,20 @@ const B2CLeadModal: React.FC = () => {
                   </Form.Label>
                   <Form.Select
                     size="sm"
+                    style={{ fontSize: "10px", padding: "8px" }}
                     value={salutation}
                     onChange={(e) => setSalutation(e.target.value)}
-                    style={{ fontSize: "10px", padding: "8px" }}
                   >
                     <option value="">Select</option>
-                    {["Mr.", "Ms.", "Mrs.", "Miss", "Dr."].map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
+                    <option>Mr.</option>
+                    <option>Ms.</option>
+                    <option>Mrs.</option>
+                    <option>Miss</option>
+                    <option>Dr.</option>
                   </Form.Select>
                 </Form.Group>
               </Col>
+
               <Col md={8}>
                 <Form.Group>
                   <Form.Label
@@ -201,12 +212,14 @@ const B2CLeadModal: React.FC = () => {
                   </Form.Label>
                   <Form.Control
                     size="sm"
+                    style={{ fontSize: "10px", padding: "8px" }}
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    style={{ fontSize: "10px", padding: "8px" }}
                   />
                 </Form.Group>
               </Col>
+
+              {/* Last Name */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
@@ -217,12 +230,14 @@ const B2CLeadModal: React.FC = () => {
                   </Form.Label>
                   <Form.Control
                     size="sm"
+                    style={{ fontSize: "10px", padding: "8px" }}
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    style={{ fontSize: "10px", padding: "8px" }}
                   />
                 </Form.Group>
               </Col>
+
+              {/* Lead Source */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
@@ -235,17 +250,19 @@ const B2CLeadModal: React.FC = () => {
                     size="sm"
                     value={leadSource}
                     onChange={(e) => setLeadSource(e.target.value)}
-                    style={{ fontSize: "10px" }}
+                    style={{ fontSize: "12px" }}
                   >
                     <option value="">Select Lead Source</option>
-                    {leadSources.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
+                    {leadSources.map((item) => (
+                      <option key={item.value} value={item.label}>
+                        {item.label}
                       </option>
                     ))}
                   </Form.Select>
                 </Form.Group>
               </Col>
+
+              {/* Lead Stage */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
@@ -256,9 +273,9 @@ const B2CLeadModal: React.FC = () => {
                   </Form.Label>
                   <Form.Select
                     size="sm"
+                    style={{ fontSize: "10px", padding: "8px" }}
                     value={leadStage}
                     onChange={(e) => setLeadStage(e.target.value)}
-                    style={{ fontSize: "10px", padding: "8px" }}
                   >
                     <option value="">Select Stage</option>
                     <option value="new">New</option>
@@ -272,6 +289,8 @@ const B2CLeadModal: React.FC = () => {
             </Row>
           </Form>
         </Modal.Body>
+
+        {/* FOOTER */}
         <Modal.Footer className="justify-content-between">
           <Button
             variant="outline-danger"
@@ -288,14 +307,8 @@ const B2CLeadModal: React.FC = () => {
             onClick={handleSubmit}
             disabled={isLoading}
           >
-            {isLoading ? (
-              <Spinner size="sm" animation="border" />
-            ) : (
-              <>
-                <Icon icon="mdi:account-plus-outline" className="me-1" />
-                Submit
-              </>
-            )}
+            <Icon icon="mdi:account-plus-outline" className="me-1" />
+            {isLoading ? "Submitting..." : "Submit"}
           </Button>
         </Modal.Footer>
       </Modal>

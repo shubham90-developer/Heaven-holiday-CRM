@@ -2,16 +2,41 @@
 
 import { Icon } from "@iconify/react";
 import React, { useState } from "react";
-import { Button, Modal, Form, Row, Col, InputGroup } from "react-bootstrap";
+import { Button, Modal, Form, Row, Col } from "react-bootstrap";
 import { useCreateLeadMutation } from "../../../../../../Redux/leadApi";
+
 const leadSources = [
-  { value: "Agency", label: "Agency" },
-  { value: "Website B2B", label: "Website B2B" },
-  { value: "GTX Network", label: "GTX Network" },
-  { value: "GTX Network Web", label: "GTX Network Web" },
-  { value: "Reference", label: "Reference" },
-  { value: "Walk-in", label: "Walk-in" },
-  { value: "Proposal", label: "Proposal" },
+  { value: "4513", label: "Agency" },
+  { value: "4514", label: "Website" },
+  { value: "4515", label: "Facebook" },
+  { value: "4516", label: "Tripsgateway" },
+  { value: "4517", label: "Website B2B" },
+  { value: "4518", label: "Proposal" },
+  { value: "4519", label: "GTX Network" },
+  { value: "4520", label: "GTX Network Web" },
+  { value: "6888", label: "Instagram" },
+  { value: "8412", label: "Old Customer" },
+  { value: "8413", label: "Reference" },
+  { value: "8414", label: "Walk-in" },
+  { value: "8569", label: "RAJ SIR" },
+  { value: "8570", label: "My Old Client" },
+  { value: "8571", label: "Raj Sir Facebook" },
+  { value: "8572", label: "3700" },
+  { value: "8573", label: "AHH" },
+  { value: "9102", label: "Expo Belavagi" },
+  { value: "9116", label: "Expo Kolhapur" },
+  { value: "9117", label: "Expo Sangli" },
+  { value: "9288", label: "PUNE EXPO" },
+  { value: "9345", label: "PRANAV SIR" },
+  { value: "9346", label: "PRAJWAL SIR" },
+  { value: "9347", label: "SANKET SIR" },
+  { value: "9348", label: "SAIPRASAD SIR" },
+  { value: "9349", label: "JUST DIAL" },
+  { value: "9813", label: "KASTURI GROUP" },
+  { value: "9817", label: "Pune Expo Jan 2026" },
+  { value: "9917", label: "Varsha Bugade" },
+  { value: "9940", label: "PRANEETA BUGADE" },
+  { value: "9954", label: "Sangli Agri Pandhari" },
 ];
 
 interface Props {
@@ -20,14 +45,16 @@ interface Props {
 
 const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
   const [show, setShow] = useState<boolean>(false);
-  const [form, setForm] = useState({
-    companyName: "",
-    contactPerson: "",
-    email: "",
-    phone: "",
-    source: "",
-    leadStage: "new" as const,
-  });
+  const [type, setType] = useState("agency");
+  const [showMore, setShowMore] = useState(false);
+  const [leadSource, setLeadSource] = useState<string>("");
+  const [companyName, setCompanyName] = useState<string>("");
+  const [salutation, setSalutation] = useState<string>("");
+  const [firstName, setFirstName] = useState<string>("");
+  const [lastName, setLastName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+  const [remarks, setRemarks] = useState<string>("");
   const [error, setError] = useState<string>("");
 
   const [createLead, { isLoading }] = useCreateLeadMutation();
@@ -35,34 +62,35 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
   const handleClose = () => {
     setShow(false);
     setError("");
-    setForm({
-      companyName: "",
-      contactPerson: "",
-      email: "",
-      phone: "",
-      source: "",
-      leadStage: "new",
-    });
+    setCompanyName("");
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setPhone("");
+    setSalutation("");
+    setLeadSource("");
+    setRemarks("");
+    setShowMore(false);
   };
 
   const handleSubmit = async () => {
-    if (!form.companyName || !form.phone) {
+    if (!companyName || !phone) {
       setError("Company Name and Mobile Number are required.");
       return;
     }
-
     try {
       await createLead({
-        customerName: form.contactPerson || form.companyName,
-        companyName: form.companyName,
-        email: form.email || undefined,
-        phone: form.phone,
+        customerName:
+          `${salutation} ${firstName} ${lastName}`.trim() || companyName,
+        companyName,
+        email: email || undefined,
+        phone,
         type: "B2B",
-        source: form.source || "Agency",
-        leadStage: form.leadStage,
+        source: leadSource || "Agency",
+        leadStage: "new",
         status: "unassigned",
+        remark: remarks || undefined,
       }).unwrap();
-
       handleClose();
       onSuccess?.();
     } catch (err: any) {
@@ -78,16 +106,17 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
         style={{ fontSize: "10px", fontWeight: "bold" }}
         onClick={() => setShow(true)}
       >
-        <Icon icon="mdi:domain" className="me-1" />
-        B2B Lead
+        <Icon icon="mdi:account-plus-outline" className="me-1" />
+        B2B Customer
       </Button>
 
-      <Modal show={show} onHide={handleClose} centered>
+      <Modal show={show} onHide={handleClose} size="lg" centered>
+        {/* Header */}
         <Modal.Header
           style={{ background: "#274c6b", color: "#fff" }}
           className="d-flex justify-content-between"
         >
-          <Modal.Title>Add B2B Lead</Modal.Title>
+          <Modal.Title>Add B2B-Agent</Modal.Title>
           <button
             onClick={handleClose}
             style={{
@@ -102,6 +131,7 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
           </button>
         </Modal.Header>
 
+        {/* Body */}
         <Modal.Body>
           {error && (
             <div
@@ -111,153 +141,298 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
               {error}
             </div>
           )}
-
           <Form>
-            <Row className="g-1">
-              {/* Company Name */}
-              <Col md={12}>
+            {/* Type + Company */}
+            <Row className="mb-1 align-items-center">
+              <Col md={6}>
+                <Form.Label
+                  style={{ fontSize: "10px" }}
+                  className="text-primary"
+                >
+                  Type :
+                </Form.Label>
+                <div className="d-flex gap-3">
+                  <Form.Check
+                    type="radio"
+                    label="Agency"
+                    checked={type === "agency"}
+                    onChange={() => setType("agency")}
+                    style={{ fontSize: "10px" }}
+                    className="text-primary"
+                  />
+                  <Form.Check
+                    type="radio"
+                    label="Corporate"
+                    checked={type === "corporate"}
+                    onChange={() => setType("corporate")}
+                    style={{ fontSize: "10px" }}
+                    className="text-primary"
+                  />
+                </div>
+              </Col>
+
+              <Col md={6}>
                 <Form.Group>
                   <Form.Label
-                    className="text-primary"
                     style={{ fontSize: "10px" }}
+                    className="text-primary"
                   >
                     Company Name *
                   </Form.Label>
                   <Form.Control
-                    size="sm"
-                    style={{ fontSize: "10px", padding: "8px" }}
-                    value={form.companyName}
-                    onChange={(e) =>
-                      setForm({ ...form, companyName: e.target.value })
-                    }
+                    type="text"
+                    style={{ fontSize: "10px" }}
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
                   />
                 </Form.Group>
               </Col>
+            </Row>
 
-              {/* Contact Person */}
-              <Col md={12}>
+            {/* Email + Name */}
+            <Row className="mb-1">
+              <Col md={6}>
                 <Form.Group>
                   <Form.Label
-                    className="text-primary"
                     style={{ fontSize: "10px" }}
-                  >
-                    Contact Person
-                  </Form.Label>
-                  <Form.Control
-                    size="sm"
-                    style={{ fontSize: "10px", padding: "8px" }}
-                    value={form.contactPerson}
-                    onChange={(e) =>
-                      setForm({ ...form, contactPerson: e.target.value })
-                    }
-                  />
-                </Form.Group>
-              </Col>
-
-              {/* Email */}
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label
                     className="text-primary"
-                    style={{ fontSize: "10px" }}
                   >
-                    Email ID
+                    Email Id
                   </Form.Label>
                   <Form.Control
                     type="email"
-                    size="sm"
-                    style={{ fontSize: "10px", padding: "8px" }}
-                    value={form.email}
-                    onChange={(e) =>
-                      setForm({ ...form, email: e.target.value })
-                    }
+                    placeholder="Email Id"
+                    style={{ fontSize: "10px" }}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </Form.Group>
               </Col>
 
-              {/* Mobile */}
-              <Col md={12}>
+              <Col md={2}>
                 <Form.Group>
                   <Form.Label
-                    className="text-primary"
                     style={{ fontSize: "10px" }}
+                    className="text-primary"
                   >
-                    Mobile Number *
+                    Salutation
                   </Form.Label>
-                  <InputGroup size="sm">
-                    <InputGroup.Text>🇮🇳 +91</InputGroup.Text>
-                    <Form.Control
-                      type="text"
-                      style={{ fontSize: "10px", padding: "8px" }}
-                      value={form.phone}
-                      onChange={(e) =>
-                        setForm({ ...form, phone: e.target.value })
-                      }
-                    />
-                  </InputGroup>
+                  <Form.Select
+                    style={{ fontSize: "10px" }}
+                    value={salutation}
+                    onChange={(e) => setSalutation(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option>Mr.</option>
+                    <option>Ms.</option>
+                    <option>Mrs.</option>
+                    <option>Miss.</option>
+                    <option>Dr.</option>
+                    <option>Prof.</option>
+                  </Form.Select>
                 </Form.Group>
               </Col>
 
-              {/* Lead Source */}
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label
+                    style={{ fontSize: "10px" }}
+                    className="text-primary"
+                  >
+                    First Name
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    style={{ fontSize: "10px" }}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            {/* Last Name + Mobile */}
+            <Row className="mb-1">
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label
+                    style={{ fontSize: "10px" }}
+                    className="text-primary"
+                  >
+                    Last Name
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    style={{ fontSize: "10px" }}
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={2}>
+                <Form.Group>
+                  <Form.Label>&nbsp;</Form.Label>
+                  <Form.Control
+                    value="+91"
+                    readOnly
+                    style={{ fontSize: "10px" }}
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label
+                    style={{ fontSize: "10px" }}
+                    className="text-primary"
+                  >
+                    Mobile Number *
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    style={{ fontSize: "10px" }}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            {/* Lead Source */}
+            <Row className="mb-1">
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
-                    className="text-primary"
                     style={{ fontSize: "10px" }}
+                    className="text-primary"
                   >
                     Lead Source
                   </Form.Label>
                   <Form.Select
                     size="sm"
-                    value={form.source}
-                    onChange={(e) =>
-                      setForm({ ...form, source: e.target.value })
-                    }
+                    value={leadSource}
+                    onChange={(e) => setLeadSource(e.target.value)}
                     style={{ fontSize: "12px" }}
                   >
                     <option value="">Select Lead Source</option>
                     {leadSources.map((item) => (
-                      <option key={item.value} value={item.value}>
+                      <option key={item.value} value={item.label}>
                         {item.label}
                       </option>
                     ))}
                   </Form.Select>
                 </Form.Group>
               </Col>
-
-              {/* Lead Stage */}
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label
-                    className="text-primary"
-                    style={{ fontSize: "10px" }}
-                  >
-                    Lead Stage
-                  </Form.Label>
-                  <Form.Select
-                    size="sm"
-                    style={{ fontSize: "10px", padding: "8px" }}
-                    value={form.leadStage}
-                    onChange={(e) =>
-                      setForm({ ...form, leadStage: e.target.value as any })
-                    }
-                  >
-                    <option value="new">New</option>
-                    <option value="followUp">Follow Up</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="lost">Lost</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
             </Row>
+
+            {/* Show More Toggle */}
+            <div
+              className="mb-2"
+              style={{ color: "#ff6600", cursor: "pointer", fontSize: "10px" }}
+              onClick={() => setShowMore(!showMore)}
+            >
+              {showMore ? "Show Less" : "Show More"}
+            </div>
+
+            {/* Extra Fields */}
+            {showMore && (
+              <>
+                <Row className="mb-1">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label
+                        style={{ fontSize: "10px" }}
+                        className="text-primary"
+                      >
+                        Country
+                      </Form.Label>
+                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label
+                        style={{ fontSize: "10px" }}
+                        className="text-primary"
+                      >
+                        State
+                      </Form.Label>
+                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row className="mb-1">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label
+                        style={{ fontSize: "10px" }}
+                        className="text-primary"
+                      >
+                        City
+                      </Form.Label>
+                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label
+                        style={{ fontSize: "10px" }}
+                        className="text-primary"
+                      >
+                        Area
+                      </Form.Label>
+                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Row className="mb-1">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label
+                        style={{ fontSize: "10px" }}
+                        className="text-primary"
+                      >
+                        Pincode
+                      </Form.Label>
+                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label
+                        style={{ fontSize: "10px" }}
+                        className="text-primary"
+                      >
+                        Address
+                      </Form.Label>
+                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </>
+            )}
+
+            {/* Remarks */}
+            <Form.Group>
+              <Form.Label style={{ fontSize: "10px" }} className="text-primary">
+                Remarks
+              </Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                style={{ fontSize: "10px" }}
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+              />
+            </Form.Group>
           </Form>
         </Modal.Body>
 
-        <Modal.Footer className="justify-content-between">
+        {/* Footer */}
+        <Modal.Footer>
           <Button
             variant="outline-danger"
-            size="sm"
             onClick={handleClose}
             style={{ fontSize: "10px" }}
           >
@@ -265,12 +440,10 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
           </Button>
           <Button
             variant="success"
-            size="sm"
             style={{ fontSize: "10px" }}
             onClick={handleSubmit}
             disabled={isLoading}
           >
-            <Icon icon="mdi:domain" className="me-1" />
             {isLoading ? "Submitting..." : "Submit"}
           </Button>
         </Modal.Footer>

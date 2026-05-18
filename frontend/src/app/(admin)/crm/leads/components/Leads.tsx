@@ -195,8 +195,17 @@ const Leads = () => {
                 B2B
               </Button>
 
-              <B2CLeadModal onSuccess={refetch} />
-              <B2BLeadModal onSuccess={refetch} />
+              {/* FIX: wrap refetch in arrow fn so TS is happy with onSuccess: () => void */}
+              <B2CLeadModal
+                onSuccess={() => {
+                  refetch();
+                }}
+              />
+              <B2BLeadModal
+                onSuccess={() => {
+                  refetch();
+                }}
+              />
 
               <Button
                 variant="outline-secondary"
@@ -444,10 +453,11 @@ const Leads = () => {
                             {lead.leadStage}
                           </span>
                         </div>
+                        {/* FIX: prop is customerId (not customerName), customerType cast */}
                         <FollowupModal
                           leadId={lead._id}
-                          customerName={lead.customerName}
-                          customerType={lead.type}
+                          customerId={lead._id}
+                          customerType={lead.type as "B2C" | "B2B"}
                         />
                       </td>
 
