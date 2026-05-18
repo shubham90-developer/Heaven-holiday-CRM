@@ -6,7 +6,8 @@ import { Icon } from "@iconify/react/dist/iconify.js";
 import { useGetAllQueriesQuery } from "../../../../../../Redux/queryApi";
 import { useRouter } from "next/navigation";
 import ProposalModal from "../../queries/components/ProposalModal";
-import SendMessageModal from "../../leads/components/SendMessageModal";
+import SendMessageModal from "../../queries/components/SendMessageModal";
+
 const ConfirmedQueries = () => {
   const router = useRouter();
   const [page, setPage] = useState(1);
@@ -214,7 +215,11 @@ const ConfirmedQueries = () => {
                           >
                             <Icon icon="mdi:eye-outline" />
                           </Button>
-                          <SendMessageModal />
+                          <SendMessageModal
+                            customerName={query.leadId?.customerName ?? ""}
+                            phone={query.leadId?.phone ?? ""}
+                            leadId={query.leadId?._id ?? ""}
+                          />
                         </div>
                       </td>
                     </tr>

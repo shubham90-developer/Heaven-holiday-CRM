@@ -4,21 +4,80 @@ import React, { useState } from "react";
 import { Button, Modal, Form, Nav } from "react-bootstrap";
 import { Icon } from "@iconify/react";
 
-const SendMessageModal = () => {
+interface Props {
+  customerName?: string;
+  phone?: string;
+  leadId?: string;
+}
+
+const SendMessageModal: React.FC<Props> = ({
+  customerName = "",
+  phone = "",
+  leadId = "",
+}) => {
   const [show, setShow] = useState(false);
   const [activeTab, setActiveTab] = useState("default");
+  const [customSubject, setCustomSubject] = useState("");
+  const [customMessage, setCustomMessage] = useState("");
+  const [sending, setSending] = useState(false);
 
   const handleClose = () => setShow(false);
   const handleShow = () => setShow(true);
 
-  const message = `Dear Anjali,
+  const defaultMessage = `Dear ${customerName || "Customer"},
 
 Greetings! We tried to reach you for your trip planning but couldn't talk to you.
-Pls call RAJENDRA at 8602410707.
+Please call us back at your earliest convenience.
 
 Thanks,
 A HEAVEN HOSPITALITY PVT LTD
-TRVCRM`;
+TRVCРМ`;
+
+  const whatsappLink = phone
+    ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(defaultMessage)}`
+    : "#";
+
+  const handleSendSMS = async () => {
+    if (!phone) return;
+    setSending(true);
+    try {
+      // TODO: wire to SMS API endpoint
+      // await fetch('/api/sms', { method:'POST', body: JSON.stringify({ to: phone, message: defaultMessage }) })
+      alert(`SMS would be sent to ${phone}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!leadId) return;
+    setSending(true);
+    try {
+      // TODO: wire to email API endpoint
+      // await fetch('/api/email', { method:'POST', body: JSON.stringify({ leadId, templateId: selectedTemplate }) })
+      alert(`Email would be sent for lead ${leadId}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendCustom = async (channel: "whatsapp" | "sms") => {
+    if (!customMessage.trim()) return;
+    setSending(true);
+    try {
+      if (channel === "whatsapp" && phone) {
+        window.open(
+          `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(customMessage)}`,
+          "_blank",
+        );
+      } else {
+        // TODO: wire to SMS API
+        alert(`Custom SMS would be sent to ${phone}`);
+      }
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <>
@@ -42,8 +101,14 @@ TRVCRM`;
             alignItems: "center",
           }}
         >
-          <Modal.Title>Choose Message</Modal.Title>
-
+          <Modal.Title style={{ fontSize: "15px" }}>
+            Send Message
+            {customerName && (
+              <span style={{ fontSize: "12px", opacity: 0.8, marginLeft: 8 }}>
+                — {customerName} {phone && `(${phone})`}
+              </span>
+            )}
+          </Modal.Title>
           <button
             onClick={handleClose}
             style={{
@@ -84,7 +149,7 @@ TRVCRM`;
               <Form.Check
                 type="radio"
                 name="defaultMsg"
-                label="Phone Didn't Picked"
+                label="Phone Didn't Pick"
                 className="mb-3"
                 defaultChecked
               />
@@ -95,9 +160,10 @@ TRVCRM`;
                   padding: "15px",
                   borderRadius: "6px",
                   whiteSpace: "pre-line",
+                  fontSize: "11px",
                 }}
               >
-                {message}
+                {defaultMessage}
               </div>
 
               <div className="text-end mt-3 d-flex gap-2 justify-content-end">
@@ -105,11 +171,22 @@ TRVCRM`;
                   variant="success"
                   size="sm"
                   style={{ fontSize: "10px" }}
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  as="a"
+                  disabled={!phone}
                 >
-                  <Icon icon="mdi:whatsapp" width="12" className="mx-1" /> Whats
-                  App
+                  <Icon icon="mdi:whatsapp" width="12" className="mx-1" />
+                  WhatsApp
                 </Button>
-                <Button variant="info" size="sm" style={{ fontSize: "10px" }}>
+                <Button
+                  variant="info"
+                  size="sm"
+                  style={{ fontSize: "10px" }}
+                  onClick={handleSendSMS}
+                  disabled={sending || !phone}
+                >
                   <Icon icon="mdi:sms" width="12" className="mx-1" /> SMS
                 </Button>
               </div>
@@ -118,11 +195,33 @@ TRVCRM`;
 
           {/* WHATSAPP TAB */}
           {activeTab === "whatsapp" && (
-            <div className="text-end">
-              <Button variant="success" size="sm" style={{ fontSize: "10px" }}>
-                Send
-              </Button>
-            </div>
+            <>
+              {phone ? (
+                <p style={{ fontSize: "11px" }}>
+                  Opens WhatsApp chat with{" "}
+                  <strong>{customerName || phone}</strong> ({phone})
+                </p>
+              ) : (
+                <p className="text-muted" style={{ fontSize: "11px" }}>
+                  No phone number available for this customer.
+                </p>
+              )}
+              <div className="text-end">
+                <Button
+                  variant="success"
+                  size="sm"
+                  style={{ fontSize: "10px" }}
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  as="a"
+                  disabled={!phone}
+                >
+                  <Icon icon="mdi:whatsapp" width="12" className="me-1" />
+                  Open WhatsApp
+                </Button>
+              </div>
+            </>
           )}
 
           {/* EMAIL TAB */}
@@ -134,7 +233,6 @@ TRVCRM`;
                 label="Call Back"
                 className="mb-2"
               />
-
               <Form.Check
                 type="radio"
                 name="emailMsg"
@@ -142,10 +240,14 @@ TRVCRM`;
                 className="mb-4"
                 defaultChecked
               />
-
               <div className="text-end">
-                <Button size="sm" style={{ fontSize: "10px" }}>
-                  Send Mail
+                <Button
+                  size="sm"
+                  style={{ fontSize: "10px" }}
+                  onClick={handleSendEmail}
+                  disabled={sending || !leadId}
+                >
+                  {sending ? "Sending…" : "Send Mail"}
                 </Button>
               </div>
             </>
@@ -165,6 +267,8 @@ TRVCRM`;
                   type="text"
                   placeholder="Subject"
                   style={{ fontSize: "10px" }}
+                  value={customSubject}
+                  onChange={(e) => setCustomSubject(e.target.value)}
                 />
               </Form.Group>
 
@@ -177,25 +281,32 @@ TRVCRM`;
                 </Form.Label>
                 <Form.Control
                   as="textarea"
-                  rows={3}
-                  placeholder="Message"
+                  rows={4}
+                  placeholder="Type your message..."
                   style={{ fontSize: "10px" }}
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
                 />
               </Form.Group>
 
-              <div className="text-end">
+              <div className="text-end d-flex gap-2 justify-content-end">
                 <Button
                   variant="success"
-                  className="me-2"
                   size="sm"
                   style={{ fontSize: "10px" }}
+                  onClick={() => handleSendCustom("whatsapp")}
+                  disabled={sending || !phone || !customMessage.trim()}
                 >
-                  <Icon icon="mdi:whatsapp" width="12" className="mx-1" />{" "}
-                  Whatsapp
+                  <Icon icon="mdi:whatsapp" width="12" className="mx-1" />
+                  WhatsApp
                 </Button>
-
-                <Button size="sm" style={{ fontSize: "10px" }}>
-                  <Icon icon="mdi:sms" width="12" className="mx-1" /> Send Mail
+                <Button
+                  size="sm"
+                  style={{ fontSize: "10px" }}
+                  onClick={() => handleSendCustom("sms")}
+                  disabled={sending || !phone || !customMessage.trim()}
+                >
+                  <Icon icon="mdi:sms" width="12" className="mx-1" /> SMS
                 </Button>
               </div>
             </>

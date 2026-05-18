@@ -1,34 +1,127 @@
 "use client";
 
 import React, { useState } from "react";
-import { Button, Modal, Table, Form } from "react-bootstrap";
+import { Button, Modal, Form } from "react-bootstrap";
+import {
+  useCreateFollowUpMutation,
+  useGetFollowUpsByLeadQuery,
+} from "../../../../../../Redux/followUpApi";
+import { useGetAllStaffQuery } from "../../../../../../Redux/staffApi";
 
-const FollowupModal: React.FC = () => {
-  const [status, setStatus] = useState("");
+interface Props {
+  leadId: string;
+  queryId: string;
+  customerName: string;
+  customerType: "B2C" | "B2B";
+}
+
+const FollowupModal: React.FC<Props> = ({
+  leadId,
+  queryId,
+  customerName,
+  customerType,
+}) => {
   const [showAdd, setShowAdd] = useState(false);
-
-  // TAB STATES
+  const [status, setStatus] = useState("");
   const [type, setType] = useState<"call" | "todo">("call");
   const [direction, setDirection] = useState<"outgoing" | "incoming">(
     "outgoing",
   );
   const [outcome, setOutcome] = useState<
-    "answered" | "unanswered" | "not_reachable"
+    "answered" | "unanswered" | "notReachable"
   >("answered");
   const [action, setAction] = useState<
-    "callback" | "todo" | "meeting" | "query" | "lost"
-  >("callback");
+    "callBack" | "todo" | "meeting" | "createQuery" | "lost"
+  >("callBack");
   const [dateType, setDateType] = useState<
     "today" | "tomorrow" | "2days" | "3days" | "custom"
   >("today");
+  const [customDate, setCustomDate] = useState("");
+  const [time, setTime] = useState("");
+  const [assignedTo, setAssignedTo] = useState("");
+  const [details, setDetails] = useState("");
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  // helper
+  const [createFollowUp] = useCreateFollowUpMutation();
+  const { data: staffData } = useGetAllStaffQuery({ archived: false });
+  const staffList = staffData?.data ?? [];
+
   const getVariant = (value: string, selected: string) =>
     value === selected ? "primary" : "outline-secondary";
 
+  const resolveDate = (): string => {
+    const d = new Date();
+    if (dateType === "today") return d.toISOString().slice(0, 10);
+    if (dateType === "tomorrow") {
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10);
+    }
+    if (dateType === "2days") {
+      d.setDate(d.getDate() + 2);
+      return d.toISOString().slice(0, 10);
+    }
+    if (dateType === "3days") {
+      d.setDate(d.getDate() + 3);
+      return d.toISOString().slice(0, 10);
+    }
+    return customDate;
+  };
+
+  const handleSubmit = async () => {
+    setError("");
+    if (!assignedTo) {
+      setError("Please select a staff member to assign.");
+      return;
+    }
+    const followUpDate = resolveDate();
+    if (!followUpDate) {
+      setError("Please set a follow-up date.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await createFollowUp({
+        leadId,
+        queryId,
+        activityType: type,
+        direction,
+        outcome,
+        nextAction: action,
+        followUpDate,
+        followUpTime: time || "09:00",
+        remindBefore: 30,
+        assignedTo,
+        customerId: leadId,
+        customerType,
+        details,
+        isCompleted,
+      }).unwrap();
+
+      // Reset form
+      setShowAdd(false);
+      setStatus("");
+      setType("call");
+      setDirection("outgoing");
+      setOutcome("answered");
+      setAction("callBack");
+      setDateType("today");
+      setCustomDate("");
+      setTime("");
+      setAssignedTo("");
+      setDetails("");
+      setIsCompleted(false);
+    } catch (err: any) {
+      setError(err?.data?.message ?? "Failed to save follow-up.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
-      {/* BUTTON */}
       <Button
         size="sm"
         onClick={() => setShowAdd(true)}
@@ -37,8 +130,7 @@ const FollowupModal: React.FC = () => {
         Follow Up
       </Button>
 
-      {/* ================= ADD MODAL ================= */}
-      <Modal show={showAdd} onHide={() => setShowAdd(false)} size="md" centered>
+      <Modal show={showAdd} onHide={() => setShowAdd(false)} size="sm" centered>
         <Modal.Header
           style={{
             background: "#274c6b",
@@ -48,8 +140,14 @@ const FollowupModal: React.FC = () => {
             alignItems: "center",
           }}
         >
-          <Modal.Title>Add To Do / Follow Up</Modal.Title>
-
+          <Modal.Title style={{ fontSize: "15px" }}>
+            Add Follow Up
+            {customerName && (
+              <span style={{ fontSize: "11px", opacity: 0.8, marginLeft: 8 }}>
+                — {customerName}
+              </span>
+            )}
+          </Modal.Title>
           <button
             onClick={() => setShowAdd(false)}
             style={{
@@ -65,280 +163,218 @@ const FollowupModal: React.FC = () => {
         </Modal.Header>
 
         <Modal.Body>
+          {error && (
+            <div
+              className="alert alert-danger py-1"
+              style={{ fontSize: "11px" }}
+            >
+              {error}
+            </div>
+          )}
+
           {/* TYPE */}
           <div className="mb-2">
-            <Button
-              size="sm"
-              variant={getVariant("call", type)}
-              onClick={() => setType("call")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              Call
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("todo", type)}
-              onClick={() => setType("todo")}
-              style={{ fontSize: "10px" }}
-            >
-              To Do
-            </Button>
+            {(["call", "todo"] as const).map((t) => (
+              <Button
+                key={t}
+                size="sm"
+                variant={getVariant(t, type)}
+                onClick={() => setType(t)}
+                className="me-2"
+                style={{ fontSize: "10px", textTransform: "capitalize" }}
+              >
+                {t === "call" ? "Call" : "To Do"}
+              </Button>
+            ))}
           </div>
 
-          {/* DIRECTION */}
-          <div className="mb-2">
-            <Button
-              size="sm"
-              variant={getVariant("outgoing", direction)}
-              onClick={() => setDirection("outgoing")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              Outgoing
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("incoming", direction)}
-              onClick={() => setDirection("incoming")}
-              style={{ fontSize: "10px" }}
-            >
-              Incoming
-            </Button>
-          </div>
+          {/* DIRECTION (only for calls) */}
+          {type === "call" && (
+            <div className="mb-2">
+              {(["outgoing", "incoming"] as const).map((d) => (
+                <Button
+                  key={d}
+                  size="sm"
+                  variant={getVariant(d, direction)}
+                  onClick={() => setDirection(d)}
+                  className="me-2"
+                  style={{ fontSize: "10px", textTransform: "capitalize" }}
+                >
+                  {d.charAt(0).toUpperCase() + d.slice(1)}
+                </Button>
+              ))}
+            </div>
+          )}
 
-          {/* OUTCOME */}
-          <h6 className="text-primary mt-2">Out Come</h6>
-          <div className="mb-2">
-            <Button
-              size="sm"
-              variant={getVariant("answered", outcome)}
-              onClick={() => setOutcome("answered")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              Answered
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("unanswered", outcome)}
-              onClick={() => setOutcome("unanswered")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              Unanswered
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("not_reachable", outcome)}
-              onClick={() => setOutcome("not_reachable")}
-              style={{ fontSize: "10px" }}
-            >
-              Not Reachable
-            </Button>
-          </div>
+          {/* OUTCOME (only for calls) */}
+          {type === "call" && (
+            <>
+              <h6 className="text-primary mt-2" style={{ fontSize: "11px" }}>
+                Outcome
+              </h6>
+              <div className="mb-2">
+                {(
+                  [
+                    ["answered", "Answered"],
+                    ["unanswered", "Unanswered"],
+                    ["notReachable", "Not Reachable"],
+                  ] as const
+                ).map(([val, label]) => (
+                  <Button
+                    key={val}
+                    size="sm"
+                    variant={getVariant(val, outcome)}
+                    onClick={() => setOutcome(val)}
+                    className="me-2 mb-1"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
 
-          {/* ACTION */}
-          <div className="mb-2">
-            <Button
-              size="sm"
-              variant={getVariant("callback", action)}
-              onClick={() => setAction("callback")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              Call Back
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("todo", action)}
-              onClick={() => setAction("todo")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              To Do
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("meeting", action)}
-              onClick={() => setAction("meeting")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              Meeting
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("query", action)}
-              onClick={() => setAction("query")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              Create Query
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("lost", action)}
-              onClick={() => setAction("lost")}
-              style={{ fontSize: "10px" }}
-            >
-              Lost
-            </Button>
+          {/* NEXT ACTION */}
+          <h6 className="text-primary mt-2" style={{ fontSize: "11px" }}>
+            Next Action
+          </h6>
+          <div className="mb-2 d-flex flex-wrap gap-1">
+            {(
+              [
+                ["callBack", "Call Back"],
+                ["todo", "To Do"],
+                ["meeting", "Meeting"],
+                ["createQuery", "Create Query"],
+                ["lost", "Lost"],
+              ] as const
+            ).map(([val, label]) => (
+              <Button
+                key={val}
+                size="sm"
+                variant={getVariant(val, action)}
+                onClick={() => setAction(val)}
+                style={{ fontSize: "10px" }}
+              >
+                {label}
+              </Button>
+            ))}
           </div>
 
           {/* DATE */}
-          <div className="mb-2">
-            <Button
-              size="sm"
-              variant={getVariant("today", dateType)}
-              onClick={() => setDateType("today")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              Today
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("tomorrow", dateType)}
-              onClick={() => setDateType("tomorrow")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              Tomorrow
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("2days", dateType)}
-              onClick={() => setDateType("2days")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              In 2 Days
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("3days", dateType)}
-              onClick={() => setDateType("3days")}
-              className="me-2"
-              style={{ fontSize: "10px" }}
-            >
-              In 3 Days
-            </Button>
-            <Button
-              size="sm"
-              variant={getVariant("custom", dateType)}
-              onClick={() => setDateType("custom")}
-              style={{ fontSize: "10px" }}
-            >
-              Custom
-            </Button>
+          <h6 className="text-primary mt-2" style={{ fontSize: "11px" }}>
+            Follow-up Date
+          </h6>
+          <div className="mb-2 d-flex flex-wrap gap-1">
+            {(
+              [
+                ["today", "Today"],
+                ["tomorrow", "Tomorrow"],
+                ["2days", "In 2 Days"],
+                ["3days", "In 3 Days"],
+                ["custom", "Custom"],
+              ] as const
+            ).map(([val, label]) => (
+              <Button
+                key={val}
+                size="sm"
+                variant={getVariant(val, dateType)}
+                onClick={() => setDateType(val)}
+                style={{ fontSize: "10px" }}
+              >
+                {label}
+              </Button>
+            ))}
           </div>
 
-          {/* CUSTOM DATE */}
           {dateType === "custom" && (
             <Form.Group className="mb-2">
-              <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
-                Custom Date
-              </Form.Label>
-              <Form.Control type="date" />
+              <Form.Control
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                style={{ fontSize: "10px" }}
+              />
             </Form.Group>
           )}
 
-          {/* FORM */}
-          <Form>
-            <Form.Group className="mb-2">
-              <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
-                Time
-              </Form.Label>
-              <Form.Control type="time" style={{ fontSize: "10px" }} />
-            </Form.Group>
-
-            <Form.Group className="mb-2">
-              <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
-                Assigned To
-              </Form.Label>
-              <Form.Control type="text" style={{ fontSize: "10px" }} />
-            </Form.Group>
-
-            <Form.Group className="mb-2">
-              <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
-                Customer
-              </Form.Label>
-              <Form.Control type="text" style={{ fontSize: "10px" }} />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
-                Select
-              </Form.Label>
-              <Form.Select
-                aria-label="Default select example"
-                style={{ fontSize: "10px" }}
-              >
-                <option>select Lead</option>
-                <option value="1">B2B</option>
-                <option value="2">B2C</option>
-              </Form.Select>
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
-                Details
-              </Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                style={{ fontSize: "10px" }}
-              />
-            </Form.Group>
-
-            <Form.Check
-              type="checkbox"
-              label="Completed"
+          {/* TIME */}
+          <Form.Group className="mb-2">
+            <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
+              Time
+            </Form.Label>
+            <Form.Control
+              type="time"
               style={{ fontSize: "10px" }}
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
             />
+          </Form.Group>
 
-            <div className="mt-3 d-flex gap-3">
+          {/* ASSIGNED TO */}
+          <Form.Group className="mb-2">
+            <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
+              Assigned To <span className="text-danger">*</span>
+            </Form.Label>
+            <Form.Select
+              style={{ fontSize: "10px" }}
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+            >
+              <option value="">— Select Staff —</option>
+              {staffList.map((s: any) => (
+                <option key={s._id} value={s._id}>
+                  {s.firstName} {s.lastName}
+                </option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+
+          {/* DETAILS */}
+          <Form.Group className="mb-3">
+            <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
+              Details
+            </Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              style={{ fontSize: "10px" }}
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              placeholder="Notes about this follow-up..."
+            />
+          </Form.Group>
+
+          <Form.Check
+            type="checkbox"
+            label="Mark as Completed"
+            style={{ fontSize: "10px" }}
+            checked={isCompleted}
+            onChange={(e) => setIsCompleted(e.target.checked)}
+          />
+
+          {/* TEMPERATURE */}
+          <div className="mt-3 d-flex gap-3">
+            {(
+              [
+                ["", "No Status"],
+                ["hot", "Hot"],
+                ["warm", "Warm"],
+                ["cold", "Cold"],
+              ] as const
+            ).map(([val, label]) => (
               <Form.Check
+                key={val}
                 type="radio"
                 name="leadStatus"
-                label="No Status"
-                value=""
-                checked={status === ""}
+                label={label}
+                value={val}
+                checked={status === val}
                 onChange={(e) => setStatus(e.target.value)}
                 style={{ fontSize: "10px" }}
               />
-
-              <Form.Check
-                type="radio"
-                name="leadStatus"
-                label="Hot"
-                value="hot"
-                checked={status === "hot"}
-                onChange={(e) => setStatus(e.target.value)}
-                style={{ fontSize: "10px" }}
-              />
-
-              <Form.Check
-                type="radio"
-                name="leadStatus"
-                label="Warm"
-                value="warm"
-                checked={status === "warm"}
-                onChange={(e) => setStatus(e.target.value)}
-                style={{ fontSize: "10px" }}
-              />
-
-              <Form.Check
-                type="radio"
-                name="leadStatus"
-                label="Cold"
-                value="cold"
-                checked={status === "cold"}
-                onChange={(e) => setStatus(e.target.value)}
-                style={{ fontSize: "10px" }}
-              />
-            </div>
-          </Form>
+            ))}
+          </div>
         </Modal.Body>
 
         <Modal.Footer>
@@ -346,11 +382,27 @@ const FollowupModal: React.FC = () => {
             variant="secondary"
             onClick={() => setShowAdd(false)}
             style={{ fontSize: "10px" }}
+            disabled={saving}
           >
             Cancel
           </Button>
-          <Button variant="primary" style={{ fontSize: "10px" }}>
-            Submit
+          <Button
+            variant="primary"
+            style={{ fontSize: "10px" }}
+            onClick={handleSubmit}
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <span
+                  className="spinner-border spinner-border-sm me-1"
+                  style={{ width: "10px", height: "10px" }}
+                />
+                Saving…
+              </>
+            ) : (
+              "Submit"
+            )}
           </Button>
         </Modal.Footer>
       </Modal>

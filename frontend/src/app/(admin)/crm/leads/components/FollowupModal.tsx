@@ -23,8 +23,6 @@ const FollowupModal: React.FC<Props> = ({
 }) => {
   const [showAdd, setShowAdd] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-
-  // TAB STATES
   const [type, setType] = useState<"call" | "todo">("call");
   const [direction, setDirection] = useState<"outgoing" | "incoming">(
     "outgoing",
@@ -126,7 +124,7 @@ const FollowupModal: React.FC<Props> = ({
         Follow Up
       </Button>
 
-      {/* =============== ADD MODAL =============== */}
+      {/* ADD MODAL */}
       <Modal show={showAdd} onHide={() => setShowAdd(false)} size="sm" centered>
         <Modal.Header
           style={{
@@ -152,7 +150,6 @@ const FollowupModal: React.FC<Props> = ({
             ✕
           </button>
         </Modal.Header>
-
         <Modal.Body>
           {/* Type */}
           <div className="mb-2">
@@ -205,24 +202,24 @@ const FollowupModal: React.FC<Props> = ({
                 Out Come
               </h6>
               <div className="mb-2">
-                {(["answered", "unanswered", "notReachable"] as const).map(
-                  (o) => (
-                    <Button
-                      key={o}
-                      size="sm"
-                      variant={gv(o, outcome)}
-                      onClick={() => setOutcome(o)}
-                      className="me-2"
-                      style={{ fontSize: "10px" }}
-                    >
-                      {o === "answered"
-                        ? "Answered"
-                        : o === "unanswered"
-                          ? "Unanswered"
-                          : "Not Reachable"}
-                    </Button>
-                  ),
-                )}
+                {(
+                  [
+                    { value: "answered", label: "Answered" },
+                    { value: "unanswered", label: "Unanswered" },
+                    { value: "notReachable", label: "Not Reachable" },
+                  ] as const
+                ).map((o) => (
+                  <Button
+                    key={o.value}
+                    size="sm"
+                    variant={gv(o.value, outcome)}
+                    onClick={() => setOutcome(o.value)}
+                    className="me-2"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {o.label}
+                  </Button>
+                ))}
               </div>
             </>
           )}
@@ -301,7 +298,6 @@ const FollowupModal: React.FC<Props> = ({
                 style={{ fontSize: "10px" }}
               />
             </Form.Group>
-
             <Form.Group className="mb-2">
               <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
                 Assigned To *
@@ -319,7 +315,6 @@ const FollowupModal: React.FC<Props> = ({
                 ))}
               </Form.Select>
             </Form.Group>
-
             <Form.Group className="mb-3">
               <Form.Label className="text-primary" style={{ fontSize: "10px" }}>
                 Details
@@ -332,7 +327,6 @@ const FollowupModal: React.FC<Props> = ({
                 style={{ fontSize: "10px" }}
               />
             </Form.Group>
-
             <Form.Check
               type="checkbox"
               label="Completed"
@@ -340,20 +334,22 @@ const FollowupModal: React.FC<Props> = ({
               onChange={(e) => setIsCompleted(e.target.checked)}
               style={{ fontSize: "10px" }}
             />
-
             <div className="mt-3 d-flex gap-3">
-              {(["", "hot", "warm", "cold"] as const).map((t) => (
+              {(
+                [
+                  { value: "", label: "No Status" },
+                  { value: "hot", label: "Hot" },
+                  { value: "warm", label: "Warm" },
+                  { value: "cold", label: "Cold" },
+                ] as const
+              ).map((t) => (
                 <Form.Check
-                  key={t}
+                  key={t.value}
                   type="radio"
                   name="leadStatus"
-                  label={
-                    t === ""
-                      ? "No Status"
-                      : t.charAt(0).toUpperCase() + t.slice(1)
-                  }
-                  value={t}
-                  checked={temperature === t}
+                  label={t.label}
+                  value={t.value}
+                  checked={temperature === t.value}
                   onChange={(e) =>
                     setTemperature(e.target.value as typeof temperature)
                   }
@@ -362,7 +358,6 @@ const FollowupModal: React.FC<Props> = ({
               ))}
             </div>
           </Form>
-
           <div className="mt-3">
             <Button
               variant="outline-secondary"
@@ -377,7 +372,6 @@ const FollowupModal: React.FC<Props> = ({
             </Button>
           </div>
         </Modal.Body>
-
         <Modal.Footer>
           <Button
             variant="secondary"
@@ -397,7 +391,7 @@ const FollowupModal: React.FC<Props> = ({
         </Modal.Footer>
       </Modal>
 
-      {/* =============== HISTORY MODAL =============== */}
+      {/* HISTORY MODAL */}
       <Modal
         show={showHistory}
         onHide={() => setShowHistory(false)}

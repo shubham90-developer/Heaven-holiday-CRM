@@ -38,7 +38,11 @@ const leadSources = [
   { value: "9954", label: "Sangli Agri Pandhari" },
 ];
 
-const B2CLeadModal: React.FC = () => {
+interface Props {
+  onSuccess?: () => void;
+}
+
+const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
   const [show, setShow] = useState<boolean>(false);
   const [leadSource, setLeadSource] = useState<string>("");
   const handleClose = () => setShow(false);

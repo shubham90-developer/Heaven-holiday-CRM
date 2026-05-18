@@ -38,7 +38,11 @@ const leadSources = [
   { value: "9954", label: "Sangli Agri Pandhari" },
 ];
 
-const B2BLeadModal = () => {
+interface Props {
+  onSuccess?: () => void;
+}
+
+const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
   const [show, setShow] = useState<boolean>(false);
   const [type, setType] = useState("agency");
   const [showMore, setShowMore] = useState(false);
