@@ -37,6 +37,7 @@ export interface ICreateLead {
   leadStage?: LeadStage;
   owner?: string;
   remark?: string;
+  archived?: boolean;
 }
 
 interface ApiResponse<T> {
@@ -73,6 +74,7 @@ export const leadApi = createApi({
         type?: string;
         temperature?: string;
         owner?: string;
+        archived?: boolean;
         page?: number;
         limit?: number;
       }

@@ -24,7 +24,7 @@ const ArchivedLeads = () => {
     data: leadsData,
     isLoading,
     refetch,
-  } = useGetAllLeadsQuery({ archived: true, page, limit: 20 } as any);
+  } = useGetAllLeadsQuery({ archived: true, page, limit: 20 });
 
   const [updateLead] = useUpdateLeadMutation();
 

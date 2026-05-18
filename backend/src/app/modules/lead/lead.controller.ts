@@ -46,7 +46,10 @@ export const getAllLeads = async (
       limit = 20,
     } = req.query;
 
-    const filter: any = { archived: false };
+    const archivedParam = req.query.archived;
+    const filter: any = {
+      archived: archivedParam === 'true' ? true : false,
+    };
     if (status) filter.status = status;
     if (type) filter.type = type;
     if (temperature) filter.temperature = temperature;
