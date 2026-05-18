@@ -8,7 +8,7 @@ import { queryRouter } from '../modules/query/query.routes';
 import { proposalRouter } from '../modules/proposal/proposal.routes';
 import { followupRouter } from '../modules/followUp/followUp.routes';
 import { bookingRouter } from '../modules/booking/booking.routes';
-
+import { supplierRouter } from '../modules/supplier/supplier.routes';
 const router = Router();
 
 const moduleRoutes = [
@@ -21,6 +21,7 @@ const moduleRoutes = [
   { path: '/proposals', route: proposalRouter },
   { path: '/followups', route: followupRouter },
   { path: '/bookings', route: bookingRouter },
+  { path: '/suppliers', route: supplierRouter },
 ];
 
 moduleRoutes.forEach((route) => router.use(route.path, route.route));

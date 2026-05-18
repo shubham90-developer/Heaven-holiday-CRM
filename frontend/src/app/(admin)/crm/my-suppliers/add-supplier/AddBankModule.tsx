@@ -3,9 +3,69 @@
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { useState } from "react";
 import { Button, Modal, Form, Row, Col } from "react-bootstrap";
+import { ISupplierBankDetail } from "../../../../../../Redux/supplierApi";
 
-const AddBankModal = () => {
+// ── Props ──────────────────────────────────────────────────────────────────
+interface Props {
+  onSave: (bank: Omit<ISupplierBankDetail, "_id">) => void;
+}
+
+const AddBankModal = ({ onSave }: Props) => {
   const [show, setShow] = useState(false);
+
+  // ── Form state ─────────────────────────────────────────────────────────
+  const [form, setForm] = useState({
+    accountName: "",
+    accountNumber: "",
+    bankName: "",
+    ifscCode: "",
+    swiftCode: "",
+    isPrimary: false,
+    country: "",
+    city: "",
+    comments: "",
+  });
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // ── Submit ─────────────────────────────────────────────────────────────
+  const handleSubmit = () => {
+    if (!form.accountNumber) {
+      alert("Account Number is required.");
+      return;
+    }
+
+    onSave({
+      accountName: form.accountName,
+      accountNumber: form.accountNumber,
+      bankName: form.bankName,
+      ifscCode: form.ifscCode,
+      swiftCode: form.swiftCode,
+      isPrimary: form.isPrimary,
+      country: form.country,
+      city: form.city,
+      comments: form.comments,
+    });
+
+    // Reset and close
+    setForm({
+      accountName: "",
+      accountNumber: "",
+      bankName: "",
+      ifscCode: "",
+      swiftCode: "",
+      isPrimary: false,
+      country: "",
+      city: "",
+      comments: "",
+    });
+    setShow(false);
+  };
 
   return (
     <>
@@ -17,7 +77,7 @@ const AddBankModal = () => {
         <Icon icon="mdi:plus" className="me-1" /> Add
       </Button>
 
-      <Modal show={show} onHide={() => setShow(false)} size="md" centered>
+      <Modal show={show} onHide={() => setShow(false)} size="sm" centered>
         <Modal.Header
           style={{ background: "#274c6b", color: "#fff" }}
           className="d-flex justify-content-between"
@@ -25,7 +85,6 @@ const AddBankModal = () => {
           <Modal.Title style={{ fontSize: "14px" }}>
             Add Supplier Bank
           </Modal.Title>
-
           <button
             onClick={() => setShow(false)}
             style={{
@@ -40,7 +99,6 @@ const AddBankModal = () => {
           </button>
         </Modal.Header>
 
-        {/* BODY */}
         <Modal.Body style={{ fontSize: "12px" }}>
           <Form>
             <Row className="mb-2">
@@ -51,7 +109,13 @@ const AddBankModal = () => {
                 >
                   Account Name
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="accountName"
+                  value={form.accountName}
+                  onChange={handleChange}
+                />
               </Col>
 
               <Col md={6}>
@@ -61,7 +125,13 @@ const AddBankModal = () => {
                 >
                   Account Number *
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="accountNumber"
+                  value={form.accountNumber}
+                  onChange={handleChange}
+                />
               </Col>
             </Row>
 
@@ -73,7 +143,13 @@ const AddBankModal = () => {
                 >
                   Bank Name
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="bankName"
+                  value={form.bankName}
+                  onChange={handleChange}
+                />
               </Col>
 
               <Col md={6}>
@@ -83,7 +159,13 @@ const AddBankModal = () => {
                 >
                   IFSC Code
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="ifscCode"
+                  value={form.ifscCode}
+                  onChange={handleChange}
+                />
               </Col>
             </Row>
 
@@ -93,9 +175,15 @@ const AddBankModal = () => {
                   className="text-primary"
                   style={{ fontSize: "12px" }}
                 >
-                  Swift Code *
+                  Swift Code
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="swiftCode"
+                  value={form.swiftCode}
+                  onChange={handleChange}
+                />
               </Col>
 
               <Col md={6}>
@@ -105,22 +193,24 @@ const AddBankModal = () => {
                 >
                   Is Primary
                 </Form.Label>
-
                 <div className="d-flex align-items-center gap-3">
                   <Form.Check
                     type="radio"
                     label="Yes"
                     name="isPrimary"
-                    value="yes"
                     style={{ fontSize: "12px" }}
+                    checked={form.isPrimary === true}
+                    onChange={() => setForm((p) => ({ ...p, isPrimary: true }))}
                   />
                   <Form.Check
                     type="radio"
                     label="No"
                     name="isPrimary"
-                    value="no"
-                    defaultChecked
                     style={{ fontSize: "12px" }}
+                    checked={form.isPrimary === false}
+                    onChange={() =>
+                      setForm((p) => ({ ...p, isPrimary: false }))
+                    }
                   />
                 </div>
               </Col>
@@ -134,16 +224,29 @@ const AddBankModal = () => {
                 >
                   Country
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="country"
+                  value={form.country}
+                  onChange={handleChange}
+                />
               </Col>
+
               <Col md={6}>
                 <Form.Label
                   className="text-primary"
                   style={{ fontSize: "12px" }}
                 >
-                  City *
+                  City
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                />
               </Col>
             </Row>
 
@@ -160,13 +263,15 @@ const AddBankModal = () => {
                   rows={1}
                   size="sm"
                   style={{ fontSize: "12px" }}
+                  name="comments"
+                  value={form.comments}
+                  onChange={handleChange}
                 />
               </Col>
             </Row>
           </Form>
         </Modal.Body>
 
-        {/* FOOTER */}
         <Modal.Footer className="d-flex justify-content-between">
           <Button
             variant="outline-danger"
@@ -177,7 +282,12 @@ const AddBankModal = () => {
             Cancel
           </Button>
 
-          <Button variant="success" size="sm" style={{ fontSize: "12px" }}>
+          <Button
+            variant="success"
+            size="sm"
+            style={{ fontSize: "12px" }}
+            onClick={handleSubmit}
+          >
             <Icon icon="akar-icons:check" className="me-1" /> Submit
           </Button>
         </Modal.Footer>

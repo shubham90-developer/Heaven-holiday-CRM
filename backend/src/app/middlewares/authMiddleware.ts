@@ -1,107 +1,97 @@
-import { Response, NextFunction } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
-import { User as UserModel } from "../modules/auth/auth.model";
-// If you later enable Staff/AdminStaff, import them and add to the `modelsToCheck` array.
-// import { Staff as StaffModel } from "../modules/staff/staff.model";
-// import { AdminStaff as AdminStaffModel } from "../modules/admin-staff/admin-staff.model";
-import { userInterface } from "./userInterface";
-import { appError } from "../errors/appError";
+import { Response, NextFunction } from 'express';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 
-/**
- * auth middleware
- * usage: auth() -> just authenticate
- *        auth('admin', 'manager') -> authenticate and authorize role
- */
+import Staff from '../modules/staff/staff.model';
+import SuperAdmin from '../modules/auth/superAdmin';
+import { userInterface } from '../modules/auth/userInterface';
+import { appError } from '../errors/appError';
+
 export const auth = (...requiredRoles: string[]) => {
   return async (req: userInterface, res: Response, next: NextFunction) => {
     try {
-      // 1) Extract token
+      // 1) Extract token from Authorization header
       const authHeader = req.headers.authorization;
       if (!authHeader) {
         return next(
-          new appError("Authentication required. No token provided.", 401)
+          new appError('Authentication required. No token provided.', 401),
         );
       }
 
-      const parts = authHeader.split(" ");
-      if (parts.length !== 2 || parts[0] !== "Bearer") {
+      const parts = authHeader.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
         return next(
           new appError(
-            "Invalid authorization header format. Expected 'Bearer <token>'.",
-            401
-          )
+            "Invalid authorization format. Expected 'Bearer <token>'.",
+            401,
+          ),
         );
       }
       const token = parts[1];
 
-      // 2) Ensure JWT secret exists
+      // 2) Ensure JWT secret is configured
       const secret = process.env.JWT_SECRET;
       if (!secret) {
-        // this is a server misconfiguration — 500
         return next(
-          new appError("Server misconfiguration: JWT secret not set.", 500)
+          new appError('Server misconfiguration: JWT secret not set.', 500),
         );
       }
 
-      // 3) Verify token (jwt.verify throws if invalid/expired)
+      // 3) Verify and decode token
       const decoded = jwt.verify(token, secret) as JwtPayload | string;
-      // We expect decoded to be an object containing userId (adjust if your token uses a different claim)
+
+      // Supports both `id` (staff/superadmin tokens) and `userId` (legacy tokens)
       const userId =
-        typeof decoded === "object" && decoded && (decoded as any).userId
-          ? (decoded as any).userId
+        typeof decoded === 'object' && decoded
+          ? (decoded as any).id || (decoded as any).userId
           : undefined;
 
       if (!userId) {
         return next(
-          new appError("Invalid token payload: missing userId.", 401)
+          new appError('Invalid token payload: missing user id.', 401),
         );
       }
 
-      // 4) Find user across models (add other models if required)
-      // Keep a list of candidate models to check — currently only UserModel is enabled
-      const modelsToCheck = [UserModel /*, StaffModel, AdminStaffModel */];
+      let user: any = null;
 
-      let user: any | null = null;
-      for (const Model of modelsToCheck) {
-        if (!Model || typeof Model.findById !== "function") continue;
-        // Using lean() would return plain object; we may want the full document sometimes
-        // Use findById(userId).select('+password') if you need private fields — careful with attaching to req.
-
-        user = await Model.findById(userId);
-        if (user) break;
+      user = await Staff.findById(userId);
+      if (!user) {
+        user = await SuperAdmin.findById(userId);
       }
 
       if (!user) {
-        return next(new appError("User not found.", 401));
+        return next(new appError('User not found or account deleted.', 401));
       }
 
-      // 5) Attach user to request (ensure your userInterface allows this)
+      // 5) Block archived or inactive staff accounts
+      if (user.archived === true || user.status === 'inactive') {
+        return next(new appError('Your account has been disabled.', 403));
+      }
+
+      // 6) Attach user to request object
       req.user = user;
 
-      // 6) Role-based authorization (if roles provided)
+      // 7) Role-based authorization — check if user's role is allowed
       if (requiredRoles.length > 0) {
-        const role = (user.role ?? "").toString();
-        if (!requiredRoles.includes(role)) {
+        const userRole = (user.role ?? '').toString();
+        if (!requiredRoles.includes(userRole)) {
           return next(
             new appError(
-              "You do not have permission to perform this action.",
-              403
-            )
+              'You do not have permission to perform this action.',
+              403,
+            ),
           );
         }
       }
 
       return next();
     } catch (err: any) {
-      // distinguish between token errors and other errors
-      if (err.name === "TokenExpiredError") {
-        return next(new appError("Token expired. Please login again.", 401));
+      if (err.name === 'TokenExpiredError') {
+        return next(new appError('Token expired. Please login again.', 401));
       }
-      if (err.name === "JsonWebTokenError") {
-        return next(new appError("Invalid token. Please login again.", 401));
+      if (err.name === 'JsonWebTokenError') {
+        return next(new appError('Invalid token. Please login again.', 401));
       }
-      // fallback
-      return next(new appError("Authentication failed.", 401));
+      return next(new appError('Authentication failed.', 401));
     }
   };
 };

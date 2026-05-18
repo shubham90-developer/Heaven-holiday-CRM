@@ -3,9 +3,83 @@
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { useState } from "react";
 import { Button, Modal, Form, Row, Col } from "react-bootstrap";
+import { ISupplierContact } from "../../../../../../Redux/supplierApi";
 
-const AddContactModal = () => {
+// ── Props ──────────────────────────────────────────────────────────────────
+interface Props {
+  onSave: (contact: Omit<ISupplierContact, "_id">) => void;
+}
+
+const AddContactModal = ({ onSave }: Props) => {
   const [show, setShow] = useState(false);
+
+  // ── Form state ────────────────────────────────────────────────────────────
+  const [form, setForm] = useState({
+    salutation: "",
+    firstName: "",
+    lastName: "",
+    designation: "",
+    department: "",
+    email: "",
+    countryCode: "+91",
+    phone: "",
+    country: "",
+    state: "",
+    city: "",
+    comments: "",
+    expertiseDestinations: "",
+  });
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+  const handleSubmit = () => {
+    if (!form.firstName || !form.phone) {
+      alert("First Name and Mobile Number are required.");
+      return;
+    }
+
+    onSave({
+      salutation: form.salutation as any,
+      firstName: form.firstName,
+      lastName: form.lastName,
+      designation: form.designation,
+      department: form.department,
+      email: form.email,
+      countryCode: form.countryCode,
+      phone: form.phone,
+      country: form.country,
+      state: form.state,
+      city: form.city,
+      comments: form.comments,
+      expertiseDestinations: form.expertiseDestinations,
+    });
+
+    // Reset form and close modal
+    setForm({
+      salutation: "",
+      firstName: "",
+      lastName: "",
+      designation: "",
+      department: "",
+      email: "",
+      countryCode: "+91",
+      phone: "",
+      country: "",
+      state: "",
+      city: "",
+      comments: "",
+      expertiseDestinations: "",
+    });
+    setShow(false);
+  };
 
   return (
     <>
@@ -25,7 +99,6 @@ const AddContactModal = () => {
           <Modal.Title style={{ fontSize: "14px" }}>
             Add Supplier Contact
           </Modal.Title>
-
           <button
             onClick={() => setShow(false)}
             style={{
@@ -40,7 +113,6 @@ const AddContactModal = () => {
           </button>
         </Modal.Header>
 
-        {/* BODY */}
         <Modal.Body style={{ fontSize: "12px" }}>
           <Form>
             <Row className="mb-2">
@@ -51,8 +123,14 @@ const AddContactModal = () => {
                 >
                   Salutation *
                 </Form.Label>
-                <Form.Select size="sm" style={{ fontSize: "12px" }}>
-                  <option>Select</option>
+                <Form.Select
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="salutation"
+                  value={form.salutation}
+                  onChange={handleChange}
+                >
+                  <option value="">Select</option>
                   <option>Mr.</option>
                   <option>Ms.</option>
                   <option>Miss</option>
@@ -68,7 +146,13 @@ const AddContactModal = () => {
                 >
                   First Name *
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="firstName"
+                  value={form.firstName}
+                  onChange={handleChange}
+                />
               </Col>
 
               <Col md={6}>
@@ -76,9 +160,15 @@ const AddContactModal = () => {
                   className="text-primary"
                   style={{ fontSize: "12px" }}
                 >
-                  Last Name *
+                  Last Name
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="lastName"
+                  value={form.lastName}
+                  onChange={handleChange}
+                />
               </Col>
             </Row>
 
@@ -90,7 +180,13 @@ const AddContactModal = () => {
                 >
                   Designation
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="designation"
+                  value={form.designation}
+                  onChange={handleChange}
+                />
               </Col>
 
               <Col md={6}>
@@ -100,7 +196,13 @@ const AddContactModal = () => {
                 >
                   Department
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="department"
+                  value={form.department}
+                  onChange={handleChange}
+                />
               </Col>
             </Row>
 
@@ -110,9 +212,15 @@ const AddContactModal = () => {
                   className="text-primary"
                   style={{ fontSize: "12px" }}
                 >
-                  Email *
+                  Email
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                />
               </Col>
 
               <Col md={6}>
@@ -122,19 +230,24 @@ const AddContactModal = () => {
                 >
                   Mobile Number *
                 </Form.Label>
-                <div className="d-flex gap-2" style={{ fontSize: "12px" }}>
+                <div className="d-flex gap-2">
                   <Form.Control
                     value="+91"
                     readOnly
                     size="sm"
-                    style={{ width: "30%" }}
+                    style={{ width: "30%", fontSize: "12px" }}
                   />
-                  <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                  <Form.Control
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                  />
                 </div>
               </Col>
             </Row>
 
-            {/* SECTION HEADER */}
             <div
               style={{
                 background: "#0f3d5e",
@@ -155,7 +268,13 @@ const AddContactModal = () => {
                 >
                   Country
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="country"
+                  value={form.country}
+                  onChange={handleChange}
+                />
               </Col>
 
               <Col md={6}>
@@ -165,7 +284,13 @@ const AddContactModal = () => {
                 >
                   State
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="state"
+                  value={form.state}
+                  onChange={handleChange}
+                />
               </Col>
             </Row>
 
@@ -175,9 +300,15 @@ const AddContactModal = () => {
                   className="text-primary"
                   style={{ fontSize: "12px" }}
                 >
-                  City *
+                  City
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                />
               </Col>
 
               <Col md={6}>
@@ -192,6 +323,9 @@ const AddContactModal = () => {
                   rows={1}
                   size="sm"
                   style={{ fontSize: "12px" }}
+                  name="comments"
+                  value={form.comments}
+                  onChange={handleChange}
                 />
               </Col>
             </Row>
@@ -202,15 +336,20 @@ const AddContactModal = () => {
                   className="text-primary"
                   style={{ fontSize: "12px" }}
                 >
-                  Expertise In (Geography) : Destinations *
+                  Expertise In (Geography) : Destinations
                 </Form.Label>
-                <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                <Form.Control
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  name="expertiseDestinations"
+                  value={form.expertiseDestinations}
+                  onChange={handleChange}
+                />
               </Col>
             </Row>
           </Form>
         </Modal.Body>
 
-        {/* FOOTER */}
         <Modal.Footer className="d-flex justify-content-between">
           <Button
             variant="outline-danger"
@@ -221,7 +360,12 @@ const AddContactModal = () => {
             Cancel
           </Button>
 
-          <Button variant="success" size="sm" style={{ fontSize: "12px" }}>
+          <Button
+            variant="success"
+            size="sm"
+            style={{ fontSize: "12px" }}
+            onClick={handleSubmit}
+          >
             <Icon icon="akar-icons:check" className="me-1" /> Submit
           </Button>
         </Modal.Footer>
