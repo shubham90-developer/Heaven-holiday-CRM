@@ -42,16 +42,28 @@ export const getAllQueries = async (
     } = req.query;
 
     const filter: any = { archived: false };
+
     if (stage) filter.stage = stage;
     if (temperature) filter.temperature = temperature;
-    if (assignedSales) filter.assignedSales = assignedSales;
-    if (assignedOps) filter.assignedOps = assignedOps;
+
+    // Frontend sends "null" string for the Un-Assigned tab
+    if (assignedSales === 'null') {
+      filter.assignedSales = null;
+    } else if (assignedSales) {
+      filter.assignedSales = assignedSales;
+    }
+
+    if (assignedOps === 'null') {
+      filter.assignedOps = null;
+    } else if (assignedOps) {
+      filter.assignedOps = assignedOps;
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
 
     const [queries, total] = await Promise.all([
       Query.find(filter)
-        .populate('leadId', 'customerName phone email type')
+        .populate('leadId', 'customerName phone email type source')
         .populate('assignedSales', 'firstName lastName')
         .populate('assignedOps', 'firstName lastName')
         .sort({ createdAt: -1 })
@@ -89,6 +101,38 @@ export const getQueriesByLead = async (
       statusCode: 200,
       message: 'Queries retrieved successfully',
       data: queries,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /v1/api/queries/counts
+// ⚠️  IMPORTANT: register this route BEFORE /:id in query.routes.ts
+//     router.get('/counts', getQueryCounts);
+//     router.get('/:id',    getQueryById);
+export const getQueryCounts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const [inProgress, confirmed, rejected, unAssigned] = await Promise.all([
+      Query.countDocuments({
+        stage: { $in: ['queryCreated', 'proposalPending', 'proposalSent'] },
+        archived: false,
+      }),
+      Query.countDocuments({ stage: 'confirmed', archived: false }),
+      Query.countDocuments({ stage: 'rejected', archived: false }),
+      // null check works because assignedSales is not required in schema
+      Query.countDocuments({ assignedSales: null, archived: false }),
+    ]);
+
+    res.json({
+      success: true,
+      statusCode: 200,
+      message: 'Query counts retrieved',
+      data: { inProgress, confirmed, rejected, unAssigned },
     });
   } catch (error) {
     next(error);
@@ -140,11 +184,9 @@ export const updateQuery = async (
     const updated = await Query.findByIdAndUpdate(
       req.params.id,
       validatedData,
-      {
-        new: true,
-      },
+      { new: true },
     )
-      .populate('leadId', 'customerName phone email type')
+      .populate('leadId', 'customerName phone email type source')
       .populate('assignedSales', 'firstName lastName')
       .populate('assignedOps', 'firstName lastName');
 
@@ -153,34 +195,6 @@ export const updateQuery = async (
       statusCode: 200,
       message: 'Query updated successfully',
       data: updated,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// GET /v1/api/queries/counts
-export const getQueryCounts = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const [inProgress, confirmed, rejected, unAssigned] = await Promise.all([
-      Query.countDocuments({
-        stage: { $in: ['queryCreated', 'proposalPending', 'proposalSent'] },
-        archived: false,
-      }),
-      Query.countDocuments({ stage: 'confirmed', archived: false }),
-      Query.countDocuments({ stage: 'rejected', archived: false }),
-      Query.countDocuments({ assignedSales: null, archived: false }),
-    ]);
-
-    res.json({
-      success: true,
-      statusCode: 200,
-      message: 'Query counts retrieved',
-      data: { inProgress, confirmed, rejected, unAssigned },
     });
   } catch (error) {
     next(error);

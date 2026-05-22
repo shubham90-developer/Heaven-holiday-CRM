@@ -122,7 +122,12 @@ const B2CCustomers = () => {
               >
                 <Icon icon="mdi:file-import" className="me-1" /> Bulk import
               </Button>
-              <AddCustomerModal onSuccess={refetch} />
+              <AddCustomerModal
+                onSuccess={() => {
+                  setSearch("");
+                  setPage(1);
+                }}
+              />
               <Button
                 variant="outline-secondary"
                 size="sm"

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button, Card, Col, Form, Row } from "react-bootstrap";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import Filter from "./Filter";
@@ -18,6 +18,8 @@ import {
 } from "../../../../../../Redux/queryApi";
 import { useGetAllStaffQuery } from "../../../../../../Redux/staffApi";
 
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+
 const STAGE_OPTIONS = [
   { value: "queryCreated", label: "Query Created" },
   { value: "proposalPending", label: "Proposal Pending" },
@@ -26,80 +28,47 @@ const STAGE_OPTIONS = [
   { value: "rejected", label: "Rejected" },
 ];
 
-// ── CSV export helper ────────────────────────────────────────────────────────
-function exportToCSV(queries: IQuery[]) {
-  const headers = [
-    "Query Number",
-    "Query Date",
-    "Customer Name",
-    "Phone",
-    "Email",
-    "Type",
-    "Travelers",
-    "Requirement",
-    "Query Type",
-    "Going From",
-    "Going To",
-    "Travel Date",
-    "Stage",
-    "Temperature",
-    "Assigned Sales",
-    "Assigned Ops",
-  ];
+const TEMPERATURE_OPTIONS = [
+  { key: "hot", label: "Hot", variant: "danger" },
+  { key: "warm", label: "Warm", variant: "warning" },
+  { key: "cold", label: "Cold", variant: "primary" },
+  { key: "", label: "No Status", variant: "dark" },
+];
 
-  const rows = queries.map((q) => [
-    q.queryNumber,
-    new Date(q.createdAt).toLocaleDateString("en-GB"),
-    q.leadId?.customerName ?? "",
-    q.leadId?.phone ?? "",
-    q.leadId?.email ?? "",
-    q.leadId?.type ?? "",
-    q.travelers,
-    q.requirementType,
-    q.queryType,
-    q.goingFrom ?? "",
-    q.goingTo,
-    q.travelDate ? new Date(q.travelDate).toLocaleDateString("en-GB") : "",
-    q.stage,
-    q.temperature,
-    q.assignedSales
-      ? `${q.assignedSales.firstName} ${q.assignedSales.lastName}`
-      : "",
-    q.assignedOps ? `${q.assignedOps.firstName} ${q.assignedOps.lastName}` : "",
-  ]);
+/**
+ * Maps UI tab keys → backend `stage` query param.
+ * undefined  = don't send the stage filter (show all stages).
+ * "null"     = special value the backend treats as assignedSales IS NULL.
+ */
+const TAB_STAGE_MAP: Record<string, string | undefined> = {
+  inProcess: "queryCreated", // shows only queryCreated stage
+  recent: undefined, // no stage filter – rely on sort
+  confirmed: "confirmed",
+  rejected: "rejected",
+  unAssigned: undefined, // filtered by assignedSales=null on backend
+  callBack: undefined,
+  overall: undefined,
+};
 
-  const csv = [headers, ...rows]
-    .map((row) =>
-      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
-    )
-    .join("\n");
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `queries_${new Date().toISOString().slice(0, 10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return "NA";
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "2-digit",
+  });
+};
 
-// ── Recent tab: queries created in last 24 hours ─────────────────────────────
-function filterRecent(queries: IQuery[]) {
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  return queries.filter((q) => new Date(q.createdAt).getTime() >= cutoff);
-}
+const getTimeAgo = (dateStr: string) => {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return `${hours}H ${mins}M`;
+};
 
-// ── Callback tab: queries whose last followup nextAction is "callBack" ────────
-// We filter client-side since the backend has no callback stage field.
-// (Upgrade: add a ?nextAction=callBack query param to the backend in future.)
-function filterCallBack(queries: IQuery[]) {
-  // Until backend supports it, show "queryCreated" + "proposalPending" together
-  // as a proxy for needing follow-up. Replace this with a real filter once
-  // the backend exposes a callbackDate / callbackFlag field.
-  return queries.filter(
-    (q) => q.stage === "queryCreated" || q.stage === "proposalPending",
-  );
-}
+// ─── COMPONENT ───────────────────────────────────────────────────────────────
 
 const Queries = () => {
   const [activeTab, setActiveTab] = useState<string>("inProcess");
@@ -109,79 +78,87 @@ const Queries = () => {
   const [selectedSales, setSelectedSales] = useState<string>("");
   const [selectedOps, setSelectedOps] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [archiving, setArchiving] = useState(false);
 
-  // ── Stage filter mapping ─────────────────────────────────────────────────
-  // "recent", "callBack", "overall" fetch all (no stage filter) and are
-  // narrowed client-side after the API response.
-  const stageMap: Record<string, string | undefined> = {
-    inProcess: "queryCreated",
-    recent: undefined,
-    confirmed: "confirmed",
-    rejected: "rejected",
-    unAssigned: undefined,
-    callBack: undefined,
-    overall: undefined,
+  // Accumulated rows across pages (for "Load More")
+  const [allQueries, setAllQueries] = useState<IQuery[]>([]);
+
+  // ── Build query params from UI state ──────────────────────────────────────
+  const queryParams = {
+    stage: TAB_STAGE_MAP[activeTab],
+    temperature: temperature || undefined,
+    // "null" string → backend converts to { assignedSales: null } filter
+    assignedSales: activeTab === "unAssigned" ? "null" : undefined,
+    page,
+    limit: 20,
   };
 
   const {
     data: queriesData,
     isLoading,
+    isFetching,
     refetch,
-  } = useGetAllQueriesQuery({
-    stage: stageMap[activeTab],
-    temperature: temperature || undefined,
-    assignedSales: activeTab === "unAssigned" ? "null" : undefined,
-    page,
-    limit: 20,
-  });
+  } = useGetAllQueriesQuery(queryParams);
 
   const { data: countsData } = useGetQueryCountsQuery();
   const { data: staffData } = useGetAllStaffQuery({ archived: false });
   const [updateQuery] = useUpdateQueryMutation();
 
-  const allQueries: IQuery[] = queriesData?.data ?? [];
   const counts = countsData?.data;
   const staffList = staffData?.data ?? [];
 
-  // ── Apply client-side tab narrowing ─────────────────────────────────────
-  const tabFiltered: IQuery[] = (() => {
-    if (activeTab === "recent") return filterRecent(allQueries);
-    if (activeTab === "callBack") return filterCallBack(allQueries);
-    return allQueries;
-  })();
+  // ── Accumulate pages; reset when tab / filters change ────────────────────
+  useEffect(() => {
+    if (!queriesData?.data) return;
+    if (page === 1) {
+      // First page (or filter reset) → replace list
+      setAllQueries(queriesData.data);
+    } else {
+      // Subsequent pages → append, deduplicate by _id
+      setAllQueries((prev) => {
+        const existingIds = new Set(prev.map((q) => q._id));
+        const newRows = queriesData.data.filter((q) => !existingIds.has(q._id));
+        return [...prev, ...newRows];
+      });
+    }
+  }, [queriesData]);
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "NA";
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "2-digit",
-    });
-  };
+  // Reset accumulated list and page when tab or temperature changes
+  useEffect(() => {
+    setAllQueries([]);
+    setPage(1);
+    setSelectedIds([]);
+  }, [activeTab, temperature]);
 
-  const getTimeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}H ${mins}M`;
-  };
+  // ── Client-side search filter (name / queryNumber / destination) ──────────
+  const filtered = search
+    ? allQueries.filter(
+        (q) =>
+          q.leadId?.customerName
+            ?.toLowerCase()
+            .includes(search.toLowerCase()) ||
+          q.queryNumber?.includes(search) ||
+          q.goingTo?.toLowerCase().includes(search.toLowerCase()),
+      )
+    : allQueries;
 
-  const toggleSelect = (id: string) => {
+  // ── Selection helpers ────────────────────────────────────────────────────
+  const toggleSelect = (id: string) =>
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
-  };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === filtered.length) setSelectedIds([]);
-    else setSelectedIds(filtered.map((q) => q._id));
-  };
+  const toggleSelectAll = () =>
+    setSelectedIds(
+      selectedIds.length === filtered.length ? [] : filtered.map((q) => q._id),
+    );
 
+  // ── Stage change (single row) ────────────────────────────────────────────
   const handleStageChange = async (id: string, stage: string) => {
     await updateQuery({ id, body: { stage: stage as any } });
+    // invalidatesTags: ["Query"] on updateQuery auto-refetches all Query endpoints
   };
 
+  // ── Bulk assign sales ────────────────────────────────────────────────────
   const handleBulkAssignSales = async () => {
     if (!selectedSales || selectedIds.length === 0) return;
     await Promise.all(
@@ -190,9 +167,11 @@ const Queries = () => {
       ),
     );
     setSelectedIds([]);
-    refetch();
+    setSelectedSales("");
+    // RTK invalidatesTags handles refetch automatically
   };
 
+  // ── Bulk assign ops ──────────────────────────────────────────────────────
   const handleBulkAssignOps = async () => {
     if (!selectedOps || selectedIds.length === 0) return;
     await Promise.all(
@@ -201,64 +180,35 @@ const Queries = () => {
       ),
     );
     setSelectedIds([]);
-    refetch();
+    setSelectedOps("");
   };
 
-  // ── Archive selected queries ─────────────────────────────────────────────
-  const handleBulkArchive = async () => {
+  // ── Archive selected (set archived: true) ────────────────────────────────
+  const handleArchiveSelected = async () => {
     if (selectedIds.length === 0) return;
-    setArchiving(true);
-    try {
-      await Promise.all(
-        selectedIds.map((id) =>
-          updateQuery({ id, body: { archived: true } as any }),
-        ),
-      );
-      setSelectedIds([]);
-      refetch();
-    } finally {
-      setArchiving(false);
-    }
+    await Promise.all(
+      selectedIds.map((id) =>
+        updateQuery({ id, body: { archived: true } as any }),
+      ),
+    );
+    setSelectedIds([]);
   };
 
-  // ── Search filter (applied on top of tab filter) ─────────────────────────
-  const filtered = search
-    ? tabFiltered.filter(
-        (q) =>
-          q.leadId?.customerName
-            ?.toLowerCase()
-            .includes(search.toLowerCase()) ||
-          q.queryNumber?.includes(search) ||
-          q.goingTo?.toLowerCase().includes(search.toLowerCase()),
-      )
-    : tabFiltered;
-
+  // ── Tabs config ──────────────────────────────────────────────────────────
   const tabs = [
     { key: "inProcess", label: "In Process", count: counts?.inProgress ?? 0 },
-    {
-      key: "recent",
-      label: "Recent",
-      count: filterRecent(allQueries).length,
-    },
+    { key: "recent", label: "Recent", count: 0 },
     { key: "confirmed", label: "Confirmed", count: counts?.confirmed ?? 0 },
     { key: "rejected", label: "Rejected", count: counts?.rejected ?? 0 },
-    {
-      key: "unAssigned",
-      label: "Un Assigned",
-      count: counts?.unAssigned ?? 0,
-    },
-    {
-      key: "callBack",
-      label: "Call Back",
-      count: filterCallBack(allQueries).length,
-    },
-    {
-      key: "overall",
-      label: "Overall",
-      count: queriesData?.pagination?.total ?? 0,
-    },
+    { key: "unAssigned", label: "Un Assigned", count: counts?.unAssigned ?? 0 },
+    { key: "callBack", label: "Call Back", count: 0 },
+    { key: "overall", label: "Overall", count: 0 },
   ];
 
+  const total = queriesData?.pagination?.total ?? 0;
+  const hasMore = allQueries.length < total;
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
       <div className="mb-2">
@@ -269,7 +219,7 @@ const Queries = () => {
         <div className="mb-4">
           {/* ── Top bar ── */}
           <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
-            {/* Left: assign selects */}
+            {/* Left: bulk assign */}
             <div className="d-flex align-items-center gap-2 flex-wrap">
               <select
                 className="form-select form-select-sm w-auto"
@@ -318,7 +268,7 @@ const Queries = () => {
               </Button>
             </div>
 
-            {/* Right: B2C/B2B modal + refresh + export */}
+            {/* Right: create lead modals + refresh + export */}
             <div className="d-flex align-items-center gap-2">
               <B2CLeadModal onSuccess={refetch} />
               <B2BLeadModal onSuccess={refetch} />
@@ -327,16 +277,14 @@ const Queries = () => {
                 size="sm"
                 style={{ fontSize: "10px", fontWeight: "bold" }}
                 onClick={refetch}
+                disabled={isFetching}
               >
-                <Icon icon="mdi:refresh" />
+                <Icon icon={isFetching ? "mdi:loading" : "mdi:refresh"} />
               </Button>
               <Button
                 variant="outline-secondary"
                 size="sm"
                 style={{ fontSize: "10px", fontWeight: "bold" }}
-                title="Export to CSV"
-                onClick={() => exportToCSV(filtered)}
-                disabled={filtered.length === 0}
               >
                 <Icon icon="mdi:file-export" />
               </Button>
@@ -347,62 +295,36 @@ const Queries = () => {
           <Row className="align-items-center mb-2">
             <Col lg={8}>
               <div className="d-flex align-items-center gap-2 flex-wrap">
-                {/* Archive selected */}
                 <Button
                   variant="outline-primary"
                   size="sm"
                   style={{ fontSize: "10px", fontWeight: "600" }}
-                  disabled={selectedIds.length === 0 || archiving}
-                  onClick={handleBulkArchive}
+                  disabled={selectedIds.length === 0}
+                  onClick={handleArchiveSelected}
                 >
-                  {archiving ? (
-                    <>
-                      <span
-                        className="spinner-border spinner-border-sm me-1"
-                        style={{ width: "10px", height: "10px" }}
-                      />
-                      Archiving…
-                    </>
-                  ) : (
-                    `Archive${selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}`
-                  )}
+                  Archive
                 </Button>
 
-                {[
-                  { key: "hot", label: "Hot", variant: "danger" },
-                  { key: "warm", label: "Warm", variant: "warning" },
-                  { key: "cold", label: "Cold", variant: "primary" },
-                  { key: "", label: "No Status", variant: "dark" },
-                ].map((t) => (
+                {TEMPERATURE_OPTIONS.map((t) => (
                   <Button
                     key={t.key}
                     variant={
-                      temperature === t.key
-                        ? t.variant
-                        : `outline-${t.variant === "warning" ? "warning" : t.variant}`
+                      temperature === t.key ? t.variant : `outline-${t.variant}`
                     }
                     size="sm"
                     style={{ fontSize: "10px", fontWeight: "600" }}
-                    onClick={() => {
-                      setTemperature(t.key);
-                      setPage(1);
-                    }}
+                    onClick={() => setTemperature(t.key)}
                   >
                     {t.label}
                   </Button>
                 ))}
               </div>
             </Col>
+
             <Col lg={4}>
               <h6 className="fw-bold">
-                Total Record Found :{" "}
-                <span className="text-primary">
-                  {activeTab === "overall" ||
-                  activeTab === "recent" ||
-                  activeTab === "callBack"
-                    ? filtered.length
-                    : (queriesData?.pagination?.total ?? 0)}
-                </span>
+                Total Record Found:{" "}
+                <span className="text-primary">{total}</span>
               </h6>
               <input
                 type="search"
@@ -426,11 +348,7 @@ const Queries = () => {
                   }
                   size="sm"
                   style={{ fontSize: "10px", fontWeight: "bold" }}
-                  onClick={() => {
-                    setActiveTab(tab.key);
-                    setPage(1);
-                    setSelectedIds([]);
-                  }}
+                  onClick={() => setActiveTab(tab.key)}
                 >
                   {tab.label}
                   {tab.count > 0 && (
@@ -441,6 +359,7 @@ const Queries = () => {
                 </Button>
               ))}
             </div>
+
             <div className="d-flex align-items-center gap-2">
               <select
                 className="form-select form-select-sm w-auto"
@@ -456,7 +375,6 @@ const Queries = () => {
                 variant="danger"
                 size="sm"
                 style={{ fontSize: "10px", fontWeight: "bold" }}
-                disabled={selectedIds.length === 0}
               >
                 Email
               </Button>
@@ -484,8 +402,8 @@ const Queries = () => {
                     <Form.Check
                       type="checkbox"
                       checked={
-                        filtered.length > 0 &&
-                        selectedIds.length === filtered.length
+                        selectedIds.length === filtered.length &&
+                        filtered.length > 0
                       }
                       onChange={toggleSelectAll}
                     />
@@ -627,7 +545,6 @@ const Queries = () => {
                           />
                           <TouchPointsModal
                             queryId={query._id}
-                            leadId={query.leadId?._id ?? ""}
                             customerName={query.leadId?.customerName ?? ""}
                           />
                         </div>
@@ -651,15 +568,10 @@ const Queries = () => {
                             size="sm"
                             style={{ fontSize: "10px" }}
                             title="View"
-                            href={`/crm/queries/${query._id}`}
                           >
                             <Icon icon="mdi:eye-outline" />
                           </Button>
-                          <SendMessageModal
-                            customerName={query.leadId?.customerName ?? ""}
-                            phone={query.leadId?.phone ?? ""}
-                            leadId={query.leadId?._id ?? ""}
-                          />
+                          <SendMessageModal />
                         </div>
                       </td>
                     </tr>
@@ -670,23 +582,28 @@ const Queries = () => {
           </div>
         )}
 
-        {/* ── Load More (only for paginated tabs) ── */}
-        {activeTab !== "recent" &&
-          activeTab !== "callBack" &&
-          activeTab !== "overall" &&
-          queriesData?.pagination &&
-          allQueries.length < queriesData.pagination.total && (
-            <div className="d-flex justify-content-center mt-4">
-              <Button
-                variant="primary"
-                size="sm"
-                style={{ fontSize: "10px", fontWeight: "600" }}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Load More <Icon icon="mdi:reload" className="ms-1" />
-              </Button>
-            </div>
-          )}
+        {/* ── Load More ── */}
+        {!isLoading && hasMore && (
+          <div className="d-flex justify-content-center mt-4">
+            <Button
+              variant="primary"
+              size="sm"
+              style={{ fontSize: "10px", fontWeight: "600" }}
+              disabled={isFetching}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              {isFetching ? (
+                <>
+                  <Icon icon="mdi:loading" className="me-1" spin /> Loading...
+                </>
+              ) : (
+                <>
+                  Load More <Icon icon="mdi:reload" className="ms-1" />
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </Card>
     </>
   );

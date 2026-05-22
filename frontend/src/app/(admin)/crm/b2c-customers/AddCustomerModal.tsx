@@ -3,46 +3,136 @@
 import { Icon } from "@iconify/react";
 import React, { useState } from "react";
 import { Button, Modal, Form, Row, Col, InputGroup } from "react-bootstrap";
-
+import {
+  useCreateLeadMutation,
+  ICreateLead,
+} from "../../../../../Redux/leadApi";
 const leadSources = [
-  { value: "4513", label: "Agency" },
-  { value: "4514", label: "Website" },
-  { value: "4515", label: "Facebook" },
-  { value: "4516", label: "Tripsgateway" },
-  { value: "4517", label: "Website B2B" },
-  { value: "4518", label: "Proposal" },
-  { value: "4519", label: "GTX Network" },
-  { value: "4520", label: "GTX Network Web" },
-  { value: "6888", label: "Instagram" },
-  { value: "8412", label: "Old Customer" },
-  { value: "8413", label: "Reference" },
-  { value: "8414", label: "Walk-in" },
-  { value: "8569", label: "RAJ SIR" },
-  { value: "8570", label: "My Old Client" },
-  { value: "8571", label: "Raj Sir Facebook" },
-  { value: "8572", label: "3700" },
-  { value: "8573", label: "AHH" },
-  { value: "9102", label: "Expo Belavagi" },
-  { value: "9116", label: "Expo Kolhapur" },
-  { value: "9117", label: "Expo Sangli" },
-  { value: "9288", label: "PUNE EXPO" },
-  { value: "9345", label: "PRANAV SIR" },
-  { value: "9346", label: "PRAJWAL SIR" },
-  { value: "9347", label: "SANKET SIR" },
-  { value: "9348", label: "SAIPRASAD SIR" },
-  { value: "9349", label: "JUST DIAL" },
-  { value: "9813", label: "KASTURI GROUP" },
-  { value: "9817", label: "Pune Expo Jan 2026" },
-  { value: "9917", label: "Varsha Bugade" },
-  { value: "9940", label: "PRANEETA BUGADE" },
-  { value: "9954", label: "Sangli Agri Pandhari" },
+  { value: "Agency", label: "Agency" },
+  { value: "Website", label: "Website" },
+  { value: "Facebook", label: "Facebook" },
+  { value: "Tripsgateway", label: "Tripsgateway" },
+  { value: "Website B2B", label: "Website B2B" },
+  { value: "Proposal", label: "Proposal" },
+  { value: "GTX Network", label: "GTX Network" },
+  { value: "GTX Network Web", label: "GTX Network Web" },
+  { value: "Instagram", label: "Instagram" },
+  { value: "Old Customer", label: "Old Customer" },
+  { value: "Reference", label: "Reference" },
+  { value: "Walk-in", label: "Walk-in" },
+  { value: "RAJ SIR", label: "RAJ SIR" },
+  { value: "My Old Client", label: "My Old Client" },
+  { value: "Raj Sir Facebook", label: "Raj Sir Facebook" },
+  { value: "Expo Belavagi", label: "Expo Belavagi" },
+  { value: "Expo Kolhapur", label: "Expo Kolhapur" },
+  { value: "Expo Sangli", label: "Expo Sangli" },
+  { value: "PUNE EXPO", label: "PUNE EXPO" },
+  { value: "PRANAV SIR", label: "PRANAV SIR" },
+  { value: "PRAJWAL SIR", label: "PRAJWAL SIR" },
+  { value: "SANKET SIR", label: "SANKET SIR" },
+  { value: "SAIPRASAD SIR", label: "SAIPRASAD SIR" },
+  { value: "JUST DIAL", label: "JUST DIAL" },
+  { value: "KASTURI GROUP", label: "KASTURI GROUP" },
+  { value: "Pune Expo Jan 2026", label: "Pune Expo Jan 2026" },
+  { value: "Varsha Bugade", label: "Varsha Bugade" },
+  { value: "PRANEETA BUGADE", label: "PRANEETA BUGADE" },
+  { value: "Sangli Agri Pandhari", label: "Sangli Agri Pandhari" },
 ];
 
-const AddCustomerModal: React.FC = () => {
-  const [show, setShow] = useState<boolean>(false);
-  const [leadSource, setLeadSource] = useState<string>("");
-  const handleClose = () => setShow(false);
+// Lead stage values aligned with the backend enum
+const leadStages = [
+  { value: "new", label: "New" },
+  { value: "followUp", label: "Call Back" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "rejected", label: "Not Interested / Junk / Wrong Number" },
+  { value: "lost", label: "Lost Lead" },
+];
+
+const initialFormState = {
+  salutation: "",
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  source: "",
+  leadStage: "" as ICreateLead["leadStage"] | "",
+  type: "B2C" as ICreateLead["type"],
+};
+
+interface AddCustomerModalProps {
+  onSuccess?: () => void;
+}
+
+const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ onSuccess }) => {
+  const [show, setShow] = useState(false);
+  const [form, setForm] = useState(initialFormState);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [createLead, { isLoading }] = useCreateLeadMutation();
+
+  const handleClose = () => {
+    setShow(false);
+    setForm(initialFormState);
+    setErrors({});
+  };
+
   const handleShow = () => setShow(true);
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    // Clear error on change
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!form.firstName.trim()) newErrors.firstName = "First name is required.";
+    if (!form.phone.trim() || form.phone.trim().length < 10)
+      newErrors.phone = "Valid phone number is required.";
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      newErrors.email = "Enter a valid email address.";
+    if (!form.source) newErrors.source = "Lead source is required.";
+    return newErrors;
+  };
+
+  const handleSubmit = async () => {
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    const customerName = [form.salutation, form.firstName, form.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    const payload: ICreateLead = {
+      customerName,
+      phone: form.phone.trim(),
+      source: form.source,
+      type: form.type,
+      ...(form.email && { email: form.email.trim() }),
+      ...(form.leadStage && { leadStage: form.leadStage }),
+    };
+
+    try {
+      await createLead(payload).unwrap();
+      console.log("Lead created, calling onSuccess");
+      onSuccess?.();
+      handleClose();
+    } catch (err: any) {
+      // Surface server-side errors
+      const message =
+        err?.data?.message || "Something went wrong. Please try again.";
+      setErrors({ server: message });
+    }
+  };
 
   return (
     <>
@@ -64,7 +154,6 @@ const AddCustomerModal: React.FC = () => {
           className="d-flex justify-content-between"
         >
           <Modal.Title>Add Lead</Modal.Title>
-
           <button
             onClick={handleClose}
             style={{
@@ -81,6 +170,16 @@ const AddCustomerModal: React.FC = () => {
 
         {/* BODY */}
         <Modal.Body>
+          {/* Server error */}
+          {errors.server && (
+            <div
+              className="alert alert-danger py-1 mb-2"
+              style={{ fontSize: "11px" }}
+            >
+              {errors.server}
+            </div>
+          )}
+
           <Form>
             <Row className="g-1">
               {/* Email */}
@@ -90,13 +189,23 @@ const AddCustomerModal: React.FC = () => {
                     className="text-primary"
                     style={{ fontSize: "10px" }}
                   >
-                    Email ID *
+                    Email ID
                   </Form.Label>
                   <Form.Control
                     type="email"
+                    name="email"
                     size="sm"
+                    value={form.email}
+                    onChange={handleChange}
+                    isInvalid={!!errors.email}
                     style={{ fontSize: "10px", padding: "8px" }}
                   />
+                  <Form.Control.Feedback
+                    type="invalid"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {errors.email}
+                  </Form.Control.Feedback>
                 </Form.Group>
               </Col>
 
@@ -109,13 +218,22 @@ const AddCustomerModal: React.FC = () => {
                   >
                     Mobile Number *
                   </Form.Label>
-
                   <InputGroup size="sm" style={{ fontSize: "10px" }}>
                     <InputGroup.Text>🇮🇳 +91</InputGroup.Text>
                     <Form.Control
                       type="text"
+                      name="phone"
+                      value={form.phone}
+                      onChange={handleChange}
+                      isInvalid={!!errors.phone}
                       style={{ fontSize: "10px", padding: "8px" }}
                     />
+                    <Form.Control.Feedback
+                      type="invalid"
+                      style={{ fontSize: "10px" }}
+                    >
+                      {errors.phone}
+                    </Form.Control.Feedback>
                   </InputGroup>
                 </Form.Group>
               </Col>
@@ -130,10 +248,13 @@ const AddCustomerModal: React.FC = () => {
                     Salutation
                   </Form.Label>
                   <Form.Select
+                    name="salutation"
                     size="sm"
+                    value={form.salutation}
+                    onChange={handleChange}
                     style={{ fontSize: "10px", padding: "8px" }}
                   >
-                    <option>Select</option>
+                    <option value="">Select</option>
                     <option>Mr.</option>
                     <option>Ms.</option>
                     <option>Mrs.</option>
@@ -152,9 +273,19 @@ const AddCustomerModal: React.FC = () => {
                     First Name *
                   </Form.Label>
                   <Form.Control
+                    name="firstName"
                     size="sm"
+                    value={form.firstName}
+                    onChange={handleChange}
+                    isInvalid={!!errors.firstName}
                     style={{ fontSize: "10px", padding: "8px" }}
                   />
+                  <Form.Control.Feedback
+                    type="invalid"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {errors.firstName}
+                  </Form.Control.Feedback>
                 </Form.Group>
               </Col>
 
@@ -168,9 +299,34 @@ const AddCustomerModal: React.FC = () => {
                     Last Name
                   </Form.Label>
                   <Form.Control
+                    name="lastName"
                     size="sm"
+                    value={form.lastName}
+                    onChange={handleChange}
                     style={{ fontSize: "10px", padding: "8px" }}
                   />
+                </Form.Group>
+              </Col>
+
+              {/* Type (B2C / B2B) */}
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label
+                    className="text-primary"
+                    style={{ fontSize: "10px" }}
+                  >
+                    Lead Type *
+                  </Form.Label>
+                  <Form.Select
+                    name="type"
+                    size="sm"
+                    value={form.type}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px", padding: "8px" }}
+                  >
+                    <option value="B2C">B2C</option>
+                    <option value="B2B">B2B</option>
+                  </Form.Select>
                 </Form.Group>
               </Col>
 
@@ -181,22 +337,29 @@ const AddCustomerModal: React.FC = () => {
                     className="text-primary"
                     style={{ fontSize: "10px" }}
                   >
-                    Lead Source
+                    Lead Source *
                   </Form.Label>
                   <Form.Select
+                    name="source"
                     size="sm"
-                    value={leadSource}
-                    onChange={(e) => setLeadSource(e.target.value)}
+                    value={form.source}
+                    onChange={handleChange}
+                    isInvalid={!!errors.source}
                     style={{ fontSize: "12px" }}
                   >
                     <option value="">Select Lead Source</option>
-
                     {leadSources.map((item) => (
                       <option key={item.value} value={item.value}>
                         {item.label}
                       </option>
                     ))}
                   </Form.Select>
+                  <Form.Control.Feedback
+                    type="invalid"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {errors.source}
+                  </Form.Control.Feedback>
                 </Form.Group>
               </Col>
 
@@ -210,21 +373,18 @@ const AddCustomerModal: React.FC = () => {
                     Lead Stage
                   </Form.Label>
                   <Form.Select
+                    name="leadStage"
                     size="sm"
+                    value={form.leadStage}
+                    onChange={handleChange}
                     style={{ fontSize: "10px", padding: "8px" }}
                   >
                     <option value="">Select Stage</option>
-                    <option value="45">Wrong Number</option>
-                    <option value="48">Can not be Contacted</option>
-                    <option value="49">Not Interested</option>
-                    <option value="47">Junk Lead</option>
-                    <option value="51">Lost Lead</option>
-                    <option value="161">Duplicate</option>
-                    <option value="53">New</option>
-                    <option value="52">Call Back</option>
-                    <option value="159">Destination Closed</option>
-                    <option value="162">Unanswered</option>
-                    <option value="163">Not Reachable</option>
+                    {leadStages.map((stage) => (
+                      <option key={stage.value} value={stage.value}>
+                        {stage.label}
+                      </option>
+                    ))}
                   </Form.Select>
                 </Form.Group>
               </Col>
@@ -238,13 +398,34 @@ const AddCustomerModal: React.FC = () => {
             variant="outline-danger"
             size="sm"
             onClick={handleClose}
+            disabled={isLoading}
             style={{ fontSize: "10px" }}
           >
             Cancel
           </Button>
 
-          <Button variant="success" size="sm" style={{ fontSize: "10px" }}>
-            <Icon icon="mdi:account-plus-outline" className="me-1" /> Submit
+          <Button
+            variant="success"
+            size="sm"
+            onClick={handleSubmit}
+            disabled={isLoading}
+            style={{ fontSize: "10px" }}
+          >
+            {isLoading ? (
+              <>
+                <span
+                  className="spinner-border spinner-border-sm me-1"
+                  role="status"
+                  aria-hidden="true"
+                />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <Icon icon="mdi:account-plus-outline" className="me-1" />
+                Submit
+              </>
+            )}
           </Button>
         </Modal.Footer>
       </Modal>

@@ -1,95 +1,190 @@
-"use client"
-import React from 'react'
+"use client";
+import React from "react";
 import { Row, Col, Form, Button, InputGroup, Card } from "react-bootstrap";
-import Filter from './Filter'
-import { useRouter } from 'next/navigation';
-import { Icon } from '@iconify/react/dist/iconify.js';
+import Filter from "./Filter";
+import { useRouter } from "next/navigation";
+import { Icon } from "@iconify/react/dist/iconify.js";
+
+import {
+  useGetAllTransportsQuery,
+  useDeleteTransportMutation,
+} from "../../../../../Redux/transportApi";
 const Vehicles = () => {
-    const router=useRouter()
+  const router = useRouter();
+
+  const { data, isLoading, isError } = useGetAllTransportsQuery({
+    page: 1,
+    limit: 20,
+    isActive: true,
+  });
+
+  const [deleteTransport] = useDeleteTransportMutation();
+
+  const transports = data?.data ?? [];
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this transport?")) return;
+    try {
+      await deleteTransport(id).unwrap();
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert("Failed to delete transport.");
+    }
+  };
+
   return (
     <>
-      <div className='mb-2'>
-        <Filter/>
+      <div className="mb-2">
+        <Filter />
       </div>
-      <Card className='p-3'>
-  <div className="mb-2">
+      <Card className="p-3">
+        <div className="mb-2">
           <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
             {/* Left Section */}
-
             <div className="d-flex align-items-center gap-2">
-
               <Button
                 variant="primary"
                 size="sm"
                 style={{ fontSize: "10px", fontWeight: "bold" }}
               >
-               Manage Transport
+                Manage Transport
               </Button>
 
               <Button
                 variant="outline-primary"
                 size="sm"
-                   onClick={() => router.push("/my-inventory/vehicles/manage-driver")}
+                onClick={() =>
+                  router.push("/my-inventory/vehicles/manage-driver")
+                }
                 style={{ fontSize: "10px", fontWeight: "bold" }}
               >
                 Manage Driver
               </Button>
 
-                <Button
+              <Button
                 variant="outline-primary"
                 size="sm"
-                   onClick={()=>router.push('/my-inventory/vehicles/manage-guide')}
+                onClick={() =>
+                  router.push("/my-inventory/vehicles/manage-guide")
+                }
                 style={{ fontSize: "10px", fontWeight: "bold" }}
               >
                 Manage Guide
               </Button>
             </div>
 
-            {/* right side */}
+            {/* Right side */}
             <div className="d-flex align-items-center gap-2">
               <Button
                 variant="outline-danger"
                 size="sm"
                 style={{ fontSize: "10px", fontWeight: "bold" }}
-                onClick={() => router.push("/my-inventory/vehicles/add-transport")}
+                onClick={() =>
+                  router.push("/my-inventory/vehicles/add-transport")
+                }
               >
                 <Icon icon="mdi:plus" className="me-1" />
-               Add Transport
+                Add Transport
               </Button>
             </div>
           </div>
-          </div>
+        </div>
 
-         <div className="table-responsive">
-                  <table
-                    className="table table-sm table-bordered mb-0 align-middle"
-                    style={{ tableLayout: "fixed", width: "100%" }}
+        <div className="table-responsive">
+          <table
+            className="table table-sm table-bordered mb-0 align-middle"
+            style={{ tableLayout: "fixed", width: "100%" }}
+          >
+            <thead>
+              <tr style={{ fontSize: "10px", whiteSpace: "nowrap" }}>
+                <th style={{ width: "60px" }}>S.No</th>
+                <th style={{ width: "150px" }}>Car Type</th>
+                <th style={{ width: "150px" }}>Car</th>
+                <th style={{ width: "100px" }}>Ac</th>
+                <th style={{ width: "100px" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="text-center"
+                    style={{ fontSize: "12px" }}
                   >
-                    <thead>
-                      <tr style={{ fontSize: "10px", whiteSpace: "nowrap" }}>
-                        <th style={{ width: "60px" }}>S.No</th>
-<th style={{ width: "150px" }}>Car Type</th>
-<th style={{ width: "150px" }}>Car</th>
-<th style={{ width: "100px" }}>Ac</th>
-<th style={{ width: "100px" }}>Action</th>
-        </tr>
-        </thead>
-        <tbody>
-            <tr style={{ fontSize: "12px"}}>
-                <td>1</td>
-<td>Luxury</td>
-<td>superadmin car</td>
-<td>Yes</td>
-<td>Master</td>
-            </tr>
-
-        </tbody>
-
-        </table>
+                    Loading...
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="text-center text-danger"
+                    style={{ fontSize: "12px" }}
+                  >
+                    Failed to load transports.
+                  </td>
+                </tr>
+              ) : transports.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="text-center"
+                    style={{ fontSize: "12px" }}
+                  >
+                    No transports found.
+                  </td>
+                </tr>
+              ) : (
+                transports.map((transport, index) => (
+                  <tr key={transport._id} style={{ fontSize: "12px" }}>
+                    <td>{index + 1}</td>
+                    <td>{transport.carType}</td>
+                    <td>{transport.carName}</td>
+                    <td>{transport.ac}</td>
+                    <td>
+                      <div className="d-flex gap-1">
+                        <td>
+                          <div className="d-flex flex-column gap-1">
+                            <span className="action-btn">
+                              <Button
+                                variant="info"
+                                size="sm"
+                                style={{ fontSize: "8px" }}
+                                title="Edit"
+                                onClick={() =>
+                                  router.push(
+                                    `/my-inventory/vehicles/edit-transport/${transport._id}`,
+                                  )
+                                }
+                              >
+                                <Icon icon="mdi:pencil" />
+                              </Button>
+                            </span>
+                            <span className="action-btn">
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                style={{ fontSize: "8px" }}
+                                title="Deactivate"
+                                onClick={() => handleDelete(transport._id)}
+                              >
+                                <Icon icon="mdi:close-circle-outline" />
+                              </Button>
+                            </span>
+                          </div>
+                        </td>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </Card>
     </>
-  )
-}
+  );
+};
 
-export default Vehicles
+export default Vehicles;

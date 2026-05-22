@@ -3,48 +3,144 @@
 import { Icon } from "@iconify/react";
 import React, { useState } from "react";
 import { Button, Modal, Form, Row, Col } from "react-bootstrap";
+import {
+  useCreateLeadMutation,
+  ICreateLead,
+} from "../../../../../Redux/leadApi";
+import { useGetAllStaffQuery } from "../../../../../Redux/staffApi";
 
 const leadSources = [
-  { value: "4513", label: "Agency" },
-  { value: "4514", label: "Website" },
-  { value: "4515", label: "Facebook" },
-  { value: "4516", label: "Tripsgateway" },
-  { value: "4517", label: "Website B2B" },
-  { value: "4518", label: "Proposal" },
-  { value: "4519", label: "GTX Network" },
-  { value: "4520", label: "GTX Network Web" },
-  { value: "6888", label: "Instagram" },
-  { value: "8412", label: "Old Customer" },
-  { value: "8413", label: "Reference" },
-  { value: "8414", label: "Walk-in" },
-  { value: "8569", label: "RAJ SIR" },
-  { value: "8570", label: "My Old Client" },
-  { value: "8571", label: "Raj Sir Facebook" },
-  { value: "8572", label: "3700" },
-  { value: "8573", label: "AHH" },
-  { value: "9102", label: "Expo Belavagi" },
-  { value: "9116", label: "Expo Kolhapur" },
-  { value: "9117", label: "Expo Sangli" },
-  { value: "9288", label: "PUNE EXPO" },
-  { value: "9345", label: "PRANAV SIR" },
-  { value: "9346", label: "PRAJWAL SIR" },
-  { value: "9347", label: "SANKET SIR" },
-  { value: "9348", label: "SAIPRASAD SIR" },
-  { value: "9349", label: "JUST DIAL" },
-  { value: "9813", label: "KASTURI GROUP" },
-  { value: "9817", label: "Pune Expo Jan 2026" },
-  { value: "9917", label: "Varsha Bugade" },
-  { value: "9940", label: "PRANEETA BUGADE" },
-  { value: "9954", label: "Sangli Agri Pandhari" },
+  { value: "Agency", label: "Agency" },
+  { value: "Website", label: "Website" },
+  { value: "Facebook", label: "Facebook" },
+  { value: "Tripsgateway", label: "Tripsgateway" },
+  { value: "Website B2B", label: "Website B2B" },
+  { value: "Proposal", label: "Proposal" },
+  { value: "GTX Network", label: "GTX Network" },
+  { value: "GTX Network Web", label: "GTX Network Web" },
+  { value: "Instagram", label: "Instagram" },
+  { value: "Old Customer", label: "Old Customer" },
+  { value: "Reference", label: "Reference" },
+  { value: "Walk-in", label: "Walk-in" },
+  { value: "RAJ SIR", label: "RAJ SIR" },
+  { value: "My Old Client", label: "My Old Client" },
+  { value: "Raj Sir Facebook", label: "Raj Sir Facebook" },
+  { value: "AHH", label: "AHH" },
+  { value: "Expo Belavagi", label: "Expo Belavagi" },
+  { value: "Expo Kolhapur", label: "Expo Kolhapur" },
+  { value: "Expo Sangli", label: "Expo Sangli" },
+  { value: "PUNE EXPO", label: "PUNE EXPO" },
+  { value: "PRANAV SIR", label: "PRANAV SIR" },
+  { value: "PRAJWAL SIR", label: "PRAJWAL SIR" },
+  { value: "SANKET SIR", label: "SANKET SIR" },
+  { value: "SAIPRASAD SIR", label: "SAIPRASAD SIR" },
+  { value: "JUST DIAL", label: "JUST DIAL" },
+  { value: "KASTURI GROUP", label: "KASTURI GROUP" },
+  { value: "Pune Expo Jan 2026", label: "Pune Expo Jan 2026" },
+  { value: "Varsha Bugade", label: "Varsha Bugade" },
+  { value: "PRANEETA BUGADE", label: "PRANEETA BUGADE" },
+  { value: "Sangli Agri Pandhari", label: "Sangli Agri Pandhari" },
 ];
 
-const B2BLeadModal = () => {
-  const [show, setShow] = useState<boolean>(false);
-  const [type, setType] = useState("agency");
+const initialFormState = {
+  subType: "agency", // agency | corporate (UI only, not sent to backend)
+  companyName: "",
+  email: "",
+  salutation: "",
+  firstName: "",
+  lastName: "",
+  phone: "",
+  owner: "",
+  source: "",
+  remark: "",
+  // show more fields (not in backend schema, UI only)
+  country: "",
+  state: "",
+  city: "",
+  area: "",
+  pincode: "",
+  address: "",
+};
+
+interface B2BLeadModalProps {
+  onSuccess?: () => void;
+}
+
+const B2BLeadModal: React.FC<B2BLeadModalProps> = ({ onSuccess }) => {
+  const [show, setShow] = useState(false);
   const [showMore, setShowMore] = useState(false);
-  const [leadSource, setLeadSource] = useState<string>("");
-  const handleClose = () => setShow(false);
+  const [form, setForm] = useState(initialFormState);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [createLead, { isLoading }] = useCreateLeadMutation();
+  const { data: staffData } = useGetAllStaffQuery({ archived: false });
+  const staffList = staffData?.data ?? [];
+
+  const handleClose = () => {
+    setShow(false);
+    setForm(initialFormState);
+    setErrors({});
+    setShowMore(false);
+  };
+
   const handleShow = () => setShow(true);
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!form.companyName.trim())
+      newErrors.companyName = "Company name is required.";
+    if (!form.phone.trim() || form.phone.trim().length < 10)
+      newErrors.phone = "Valid phone number is required.";
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      newErrors.email = "Enter a valid email address.";
+    if (!form.source) newErrors.source = "Lead source is required.";
+    return newErrors;
+  };
+
+  const handleSubmit = async () => {
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    const customerName =
+      [form.salutation, form.firstName, form.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim() || form.companyName; // fallback to company name if no person name
+
+    const payload: ICreateLead = {
+      customerName,
+      companyName: form.companyName.trim(),
+      phone: form.phone.trim(),
+      source: form.source,
+      type: "B2B",
+      ...(form.email && { email: form.email.trim() }),
+      ...(form.owner && { owner: form.owner }),
+      ...(form.remark && { remark: form.remark.trim() }),
+    };
+
+    try {
+      await createLead(payload).unwrap();
+      onSuccess?.();
+      handleClose();
+    } catch (err: any) {
+      const message =
+        err?.data?.message || "Something went wrong. Please try again.";
+      setErrors({ server: message });
+    }
+  };
 
   return (
     <>
@@ -58,14 +154,13 @@ const B2BLeadModal = () => {
         Add B2B Customer
       </Button>
 
-      <Modal show={show} onHide={handleClose} size="md" centered>
+      <Modal show={show} onHide={handleClose} size="xl" centered>
         {/* Header */}
         <Modal.Header
           style={{ background: "#274c6b", color: "#fff" }}
           className="d-flex justify-content-between"
         >
           <Modal.Title>Add B2B-Agent</Modal.Title>
-
           <button
             onClick={handleClose}
             style={{
@@ -82,6 +177,15 @@ const B2BLeadModal = () => {
 
         {/* Body */}
         <Modal.Body>
+          {errors.server && (
+            <div
+              className="alert alert-danger py-1 mb-2"
+              style={{ fontSize: "11px" }}
+            >
+              {errors.server}
+            </div>
+          )}
+
           <Form>
             {/* Type + Company */}
             <Row className="mb-1 align-items-center">
@@ -96,16 +200,20 @@ const B2BLeadModal = () => {
                   <Form.Check
                     type="radio"
                     label="Agency"
-                    checked={type === "agency"}
-                    onChange={() => setType("agency")}
+                    checked={form.subType === "agency"}
+                    onChange={() =>
+                      setForm((prev) => ({ ...prev, subType: "agency" }))
+                    }
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   />
                   <Form.Check
                     type="radio"
                     label="Corporate"
-                    checked={type === "corporate"}
-                    onChange={() => setType("corporate")}
+                    checked={form.subType === "corporate"}
+                    onChange={() =>
+                      setForm((prev) => ({ ...prev, subType: "corporate" }))
+                    }
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   />
@@ -120,12 +228,25 @@ const B2BLeadModal = () => {
                   >
                     Company Name *
                   </Form.Label>
-                  <Form.Control type="text" style={{ fontSize: "10px" }} />
+                  <Form.Control
+                    type="text"
+                    name="companyName"
+                    value={form.companyName}
+                    onChange={handleChange}
+                    isInvalid={!!errors.companyName}
+                    style={{ fontSize: "10px" }}
+                  />
+                  <Form.Control.Feedback
+                    type="invalid"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {errors.companyName}
+                  </Form.Control.Feedback>
                 </Form.Group>
               </Col>
             </Row>
 
-            {/* Email + Name */}
+            {/* Email + Salutation + First Name */}
             <Row className="mb-1">
               <Col md={6}>
                 <Form.Group>
@@ -133,13 +254,23 @@ const B2BLeadModal = () => {
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   >
-                    Email Id *
+                    Email Id
                   </Form.Label>
                   <Form.Control
                     type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    isInvalid={!!errors.email}
                     placeholder="Email Id"
                     style={{ fontSize: "10px" }}
                   />
+                  <Form.Control.Feedback
+                    type="invalid"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {errors.email}
+                  </Form.Control.Feedback>
                 </Form.Group>
               </Col>
 
@@ -151,8 +282,13 @@ const B2BLeadModal = () => {
                   >
                     Salutation
                   </Form.Label>
-                  <Form.Select style={{ fontSize: "10px" }}>
-                    <option>Select</option>
+                  <Form.Select
+                    name="salutation"
+                    value={form.salutation}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
+                  >
+                    <option value="">Select</option>
                     <option>Mr.</option>
                     <option>Ms.</option>
                     <option>Mrs.</option>
@@ -171,7 +307,13 @@ const B2BLeadModal = () => {
                   >
                     First Name
                   </Form.Label>
-                  <Form.Control type="text" style={{ fontSize: "10px" }} />
+                  <Form.Control
+                    type="text"
+                    name="firstName"
+                    value={form.firstName}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
+                  />
                 </Form.Group>
               </Col>
             </Row>
@@ -186,7 +328,13 @@ const B2BLeadModal = () => {
                   >
                     Last Name
                   </Form.Label>
-                  <Form.Control type="text" style={{ fontSize: "10px" }} />
+                  <Form.Control
+                    type="text"
+                    name="lastName"
+                    value={form.lastName}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
+                  />
                 </Form.Group>
               </Col>
 
@@ -209,7 +357,20 @@ const B2BLeadModal = () => {
                   >
                     Mobile Number *
                   </Form.Label>
-                  <Form.Control type="text" style={{ fontSize: "10px" }} />
+                  <Form.Control
+                    type="text"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    isInvalid={!!errors.phone}
+                    style={{ fontSize: "10px" }}
+                  />
+                  <Form.Control.Feedback
+                    type="invalid"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {errors.phone}
+                  </Form.Control.Feedback>
                 </Form.Group>
               </Col>
             </Row>
@@ -224,8 +385,18 @@ const B2BLeadModal = () => {
                   >
                     RM
                   </Form.Label>
-                  <Form.Select style={{ fontSize: "10px" }}>
-                    <option>RAJENDRA BUGADE</option>
+                  <Form.Select
+                    name="owner"
+                    value={form.owner}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
+                  >
+                    <option value="">Select RM</option>
+                    {staffList.map((s: any) => (
+                      <option key={s._id} value={s._id}>
+                        {s.firstName} {s.lastName}
+                      </option>
+                    ))}
                   </Form.Select>
                 </Form.Group>
               </Col>
@@ -236,21 +407,28 @@ const B2BLeadModal = () => {
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   >
-                    Lead Source
+                    Lead Source *
                   </Form.Label>
                   <Form.Select
-                    value={leadSource}
-                    onChange={(e) => setLeadSource(e.target.value)}
+                    name="source"
+                    value={form.source}
+                    onChange={handleChange}
+                    isInvalid={!!errors.source}
                     style={{ fontSize: "10px" }}
                   >
                     <option value="">Select Lead Source</option>
-
                     {leadSources.map((item) => (
                       <option key={item.value} value={item.value}>
                         {item.label}
                       </option>
                     ))}
                   </Form.Select>
+                  <Form.Control.Feedback
+                    type="invalid"
+                    style={{ fontSize: "10px" }}
+                  >
+                    {errors.source}
+                  </Form.Control.Feedback>
                 </Form.Group>
               </Col>
             </Row>
@@ -264,7 +442,7 @@ const B2BLeadModal = () => {
               {showMore ? "Show Less" : "Show More"}
             </div>
 
-            {/* Extra Fields */}
+            {/* Extra Fields — UI only, not sent to backend */}
             {showMore && (
               <>
                 <Row className="mb-1">
@@ -276,10 +454,15 @@ const B2BLeadModal = () => {
                       >
                         Country
                       </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                      <Form.Control
+                        type="text"
+                        name="country"
+                        value={form.country}
+                        onChange={handleChange}
+                        style={{ fontSize: "10px" }}
+                      />
                     </Form.Group>
                   </Col>
-
                   <Col md={6}>
                     <Form.Group>
                       <Form.Label
@@ -288,7 +471,13 @@ const B2BLeadModal = () => {
                       >
                         State
                       </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                      <Form.Control
+                        type="text"
+                        name="state"
+                        value={form.state}
+                        onChange={handleChange}
+                        style={{ fontSize: "10px" }}
+                      />
                     </Form.Group>
                   </Col>
                 </Row>
@@ -302,10 +491,15 @@ const B2BLeadModal = () => {
                       >
                         City
                       </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                      <Form.Control
+                        type="text"
+                        name="city"
+                        value={form.city}
+                        onChange={handleChange}
+                        style={{ fontSize: "10px" }}
+                      />
                     </Form.Group>
                   </Col>
-
                   <Col md={6}>
                     <Form.Group>
                       <Form.Label
@@ -314,7 +508,13 @@ const B2BLeadModal = () => {
                       >
                         Area
                       </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                      <Form.Control
+                        type="text"
+                        name="area"
+                        value={form.area}
+                        onChange={handleChange}
+                        style={{ fontSize: "10px" }}
+                      />
                     </Form.Group>
                   </Col>
                 </Row>
@@ -328,10 +528,15 @@ const B2BLeadModal = () => {
                       >
                         Pincode
                       </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                      <Form.Control
+                        type="text"
+                        name="pincode"
+                        value={form.pincode}
+                        onChange={handleChange}
+                        style={{ fontSize: "10px" }}
+                      />
                     </Form.Group>
                   </Col>
-
                   <Col md={6}>
                     <Form.Group>
                       <Form.Label
@@ -340,7 +545,13 @@ const B2BLeadModal = () => {
                       >
                         Address
                       </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
+                      <Form.Control
+                        type="text"
+                        name="address"
+                        value={form.address}
+                        onChange={handleChange}
+                        style={{ fontSize: "10px" }}
+                      />
                     </Form.Group>
                   </Col>
                 </Row>
@@ -354,7 +565,10 @@ const B2BLeadModal = () => {
               </Form.Label>
               <Form.Control
                 as="textarea"
+                name="remark"
                 rows={3}
+                value={form.remark}
+                onChange={handleChange}
                 style={{ fontSize: "10px" }}
               />
             </Form.Group>
@@ -366,12 +580,32 @@ const B2BLeadModal = () => {
           <Button
             variant="outline-danger"
             onClick={handleClose}
+            disabled={isLoading}
             style={{ fontSize: "10px" }}
           >
             Cancel
           </Button>
-          <Button variant="success" style={{ fontSize: "10px" }}>
-            <Icon icon="mdi:account-plus-outline" className="me-1" /> Submit
+          <Button
+            variant="success"
+            onClick={handleSubmit}
+            disabled={isLoading}
+            style={{ fontSize: "10px" }}
+          >
+            {isLoading ? (
+              <>
+                <span
+                  className="spinner-border spinner-border-sm me-1"
+                  role="status"
+                  aria-hidden="true"
+                />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <Icon icon="mdi:account-plus-outline" className="me-1" />
+                Submit
+              </>
+            )}
           </Button>
         </Modal.Footer>
       </Modal>

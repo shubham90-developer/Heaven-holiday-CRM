@@ -5,10 +5,18 @@ import { staffRouter } from '../modules/staff/staff.routes';
 import { authRouter } from '../modules/auth/auth.routes';
 import { leadRouter } from '../modules/lead/lead.routes';
 import { queryRouter } from '../modules/query/query.routes';
-import { proposalRouter } from '../modules/proposal/proposal.routes';
 import { followupRouter } from '../modules/followUp/followUp.routes';
-import { bookingRouter } from '../modules/booking/booking.routes';
 import { supplierRouter } from '../modules/supplier/supplier.routes';
+import { hotelRouter } from '../modules/hotel/hotel.routes';
+import { sightSeeingRouter } from '../modules/sightseeing/sightseeing.routes';
+import { rateRouter } from '../modules/sirates/rates.routes';
+import { transportRouter } from '../modules/transport/transport.routes';
+import { driverRouter } from '../modules/driver/driver.routes';
+import { guideRouter } from '../modules/guides/guide.routes';
+import { transportRatesRouter } from '../modules/transport-rates/t-rates.routes';
+import { visaRouter } from '../modules/visa/visa.routes';
+import { itenaryRouter } from '../modules/itenary/itenary.routes';
+import { areaRouter } from '../modules/area/area.routes';
 const router = Router();
 
 const moduleRoutes = [
@@ -18,10 +26,19 @@ const moduleRoutes = [
   { path: '/auth', route: authRouter },
   { path: '/leads', route: leadRouter },
   { path: '/queries', route: queryRouter },
-  { path: '/proposals', route: proposalRouter },
   { path: '/followups', route: followupRouter },
-  { path: '/bookings', route: bookingRouter },
   { path: '/suppliers', route: supplierRouter },
+  { path: '/hotels', route: hotelRouter },
+  { path: '/sightseeings', route: sightSeeingRouter },
+  { path: '/sightseeing-rates', route: rateRouter },
+  { path: '/transports', route: transportRouter },
+  { path: '/drivers', route: driverRouter },
+  { path: '/guides', route: guideRouter },
+  { path: '/transport-routes', route: transportRatesRouter },
+  { path: '/visas', route: visaRouter },
+  { path: '/itineraries', route: itenaryRouter },
+  { path: '/areas', route: areaRouter },
+  { path: '/restaurants', route: areaRouter },
 ];
 
 moduleRoutes.forEach((route) => router.use(route.path, route.route));
