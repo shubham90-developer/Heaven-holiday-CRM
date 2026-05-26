@@ -1,21 +1,72 @@
-import mongoose, { Schema } from 'mongoose';
+import { Schema, model } from 'mongoose';
 import { ILeadDocument } from './lead.interface';
 
-const leadSchema = new Schema<ILeadDocument>(
+const LeadSchema = new Schema<ILeadDocument>(
   {
-    customerName: { type: String, required: true, trim: true },
-    companyName: { type: String, trim: true },
-    phone: { type: String, required: true, trim: true },
-    email: { type: String, trim: true },
+    type: {
+      type: String,
+      enum: ['B2C', 'B2B'],
+      required: true,
+    },
 
-    type: { type: String, enum: ['B2C', 'B2B'], required: true },
-    source: { type: String, required: true, trim: true },
+    salutation: {
+      type: String,
+      enum: ['Mr', 'Mrs', 'Ms', 'Dr', 'Prof'],
+      default: null,
+    },
+    firstName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    lastName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    customerName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    companyName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    agentType: {
+      type: String,
+      enum: ['Agency', 'Corporate'],
+      default: null,
+    },
+    remarks: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    phone: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
+
+    leadSource: {
+      type: Schema.Types.ObjectId,
+      ref: 'LeadSource',
+      required: true,
+    },
     temperature: {
       type: String,
       enum: ['hot', 'warm', 'cold', 'no-status'],
       default: 'no-status',
     },
-
     status: {
       type: String,
       enum: ['unassigned', 'inProcess', 'callback', 'archived'],
@@ -26,28 +77,41 @@ const leadSchema = new Schema<ILeadDocument>(
       enum: ['new', 'followUp', 'confirmed', 'rejected', 'lost'],
       default: 'new',
     },
-    isDuplicate: { type: Boolean, default: false },
 
-    owner: { type: Schema.Types.ObjectId, ref: 'Staff' },
-
-    remark: { type: String, trim: true },
-    archived: { type: Boolean, default: false },
+    owner: {
+      type: Schema.Types.ObjectId,
+      ref: 'Staff',
+    },
+    isDuplicate: {
+      type: Boolean,
+      default: false,
+    },
+    archived: {
+      type: Boolean,
+      default: false,
+    },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+  },
 );
 
-// Auto-detect duplicate on save (same phone or email)
-leadSchema.pre('save', async function (next) {
-  if (!this.isNew) return next();
+LeadSchema.pre('save', function (next) {
+  if (this.type === 'B2B' && !this.companyName) {
+    return next(new Error('companyName is required for B2B leads'));
+  }
 
-  const query: any[] = [{ phone: this.phone }];
-  if (this.email) query.push({ email: this.email });
-
-  const existing = await Lead.findOne({ $or: query });
-  if (existing) this.isDuplicate = true;
-
+  if (this.firstName) {
+    this.customerName = [this.salutation, this.firstName, this.lastName]
+      .filter(Boolean)
+      .join(' ');
+  }
   next();
 });
 
-const Lead = mongoose.model<ILeadDocument>('Lead', leadSchema);
-export default Lead;
+LeadSchema.index({ phone: 1 });
+LeadSchema.index({ leadSource: 1 });
+LeadSchema.index({ owner: 1 });
+LeadSchema.index({ status: 1, archived: 1 });
+
+export const Lead = model<ILeadDocument>('Lead', LeadSchema);

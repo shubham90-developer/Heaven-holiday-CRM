@@ -1,3 +1,4 @@
+// query.routes.ts
 import { Router } from 'express';
 import {
   createQuery,
@@ -5,16 +6,18 @@ import {
   getQueriesByLead,
   getQueryById,
   updateQuery,
-  getQueryCounts,
+  updateQueryStatus,
+  deleteQuery,
 } from './query.controller';
 
 const router = Router();
 
-router.get('/counts', getQueryCounts);
-router.get('/lead/:leadId', getQueriesByLead);
-router.get('/', getAllQueries);
-router.get('/:id', getQueryById);
 router.post('/', createQuery);
-router.patch('/:id', updateQuery);
+router.get('/', getAllQueries);
+router.get('/lead/:leadId', getQueriesByLead);
+router.get('/:id', getQueryById);
+router.put('/:id', updateQuery);
+router.patch('/:id/status', updateQueryStatus);
+router.delete('/:id', deleteQuery);
 
 export const queryRouter = router;

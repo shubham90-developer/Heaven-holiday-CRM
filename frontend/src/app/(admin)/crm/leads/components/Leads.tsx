@@ -1,3 +1,5 @@
+// Leads.tsx - Updated
+
 "use client";
 
 import React, { useState } from "react";
@@ -18,6 +20,7 @@ import {
   ILead,
 } from "../../../../../../Redux/leadApi";
 import { useGetAllStaffQuery } from "../../../../../../Redux/staffApi";
+
 const Leads = () => {
   const router = useRouter();
 
@@ -90,14 +93,16 @@ const Leads = () => {
     if (!selectedOwner || selectedIds.length === 0) return;
     await bulkAssign({ leadIds: selectedIds, owner: selectedOwner });
     setSelectedIds([]);
-    refetch();
   };
 
   const handleBulkArchive = async () => {
     if (selectedIds.length === 0) return;
     await bulkArchive({ leadIds: selectedIds });
     setSelectedIds([]);
-    refetch();
+  };
+
+  const handleSingleArchive = async (id: string) => {
+    await bulkArchive({ leadIds: [id] });
   };
 
   const handlePhoneSave = async (id: string) => {
@@ -110,13 +115,10 @@ const Leads = () => {
     { key: "inProcess", label: "In Process", count: counts?.inProcess ?? 0 },
     { key: "callback", label: "Callback Leads", count: counts?.callback ?? 0 },
     { key: "overall", label: "Overall Leads", count: 0 },
-    {
-      key: "unassigned",
-      label: "Un-Assigned",
-      count: counts?.unassigned ?? 0,
-    },
+    { key: "unassigned", label: "Un-Assigned", count: counts?.unassigned ?? 0 },
   ];
 
+  // Search is handled server-side via query param; client filter as fallback
   const filteredLeads = search
     ? leads.filter(
         (l) =>
@@ -195,17 +197,8 @@ const Leads = () => {
                 B2B
               </Button>
 
-              {/* FIX: wrap refetch in arrow fn so TS is happy with onSuccess: () => void */}
-              <B2CLeadModal
-                onSuccess={() => {
-                  refetch();
-                }}
-              />
-              <B2BLeadModal
-                onSuccess={() => {
-                  refetch();
-                }}
-              />
+              <B2CLeadModal onSuccess={() => refetch()} />
+              <B2BLeadModal onSuccess={() => refetch()} />
 
               <Button
                 variant="outline-secondary"
@@ -411,7 +404,7 @@ const Leads = () => {
                         )}
                       </td>
 
-                      {/* Type / Source */}
+                      {/* Type / Source — leadSource is now a populated object */}
                       <td>
                         <div>Package</div>
                         <div>
@@ -420,11 +413,19 @@ const Leads = () => {
                           >
                             {lead.type}
                           </span>
+                          {lead.agentType && (
+                            <span className="badge bg-info text-dark ms-1">
+                              {lead.agentType}
+                            </span>
+                          )}
                         </div>
-                        <div style={{ fontSize: "10px" }}>{lead.source}</div>
+                        {/* ← leadSource is now populated object */}
+                        <div style={{ fontSize: "10px" }}>
+                          {lead.leadSource?.leadSourceName ?? "—"}
+                        </div>
                       </td>
 
-                      {/* Travel Date - from query if available */}
+                      {/* Travel Date */}
                       <td>NA</td>
 
                       {/* Pax */}
@@ -453,7 +454,6 @@ const Leads = () => {
                             {lead.leadStage}
                           </span>
                         </div>
-                        {/* FIX: prop is customerId (not customerName), customerType cast */}
                         <FollowupModal
                           leadId={lead._id}
                           customerId={lead._id}
@@ -461,9 +461,9 @@ const Leads = () => {
                         />
                       </td>
 
-                      {/* Remark */}
+                      {/* Remark — field renamed to remarks */}
                       <td style={{ fontSize: "10px" }}>
-                        {lead.remark || "NA"}
+                        {lead.remarks || "NA"}
                       </td>
 
                       {/* Last Updated */}
@@ -500,7 +500,8 @@ const Leads = () => {
                             size="sm"
                             style={{ fontSize: "10px" }}
                             title="Archive"
-                            onClick={() => bulkArchive({ leadIds: [lead._id] })}
+                            disabled={archiving}
+                            onClick={() => handleSingleArchive(lead._id)}
                           >
                             <Icon icon="mdi:minus-circle-outline" />
                           </Button>

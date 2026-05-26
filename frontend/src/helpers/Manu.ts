@@ -136,16 +136,26 @@ export const getHorizontalMenuItems = (): MenuItemType[] => {
 export const findAllParent = (
   menuItems: MenuItemType[],
   menuItem: MenuItemType,
+  visited = new Set<string>(),
 ): string[] => {
-  let parents: string[] = [];
-  const parent = findMenuItem(menuItems, menuItem.parentKey);
-  if (parent) {
-    parents.push(parent.key);
-    if (parent.parentKey) {
-      parents = [...parents, ...findAllParent(menuItems, parent)];
-    }
+  if (!menuItem?.parentKey) {
+    return [];
   }
-  return parents;
+
+  // Prevent infinite recursion
+  if (visited.has(menuItem.key)) {
+    return [];
+  }
+
+  visited.add(menuItem.key);
+
+  const parent = findMenuItem(menuItems, menuItem.parentKey);
+
+  if (!parent) {
+    return [];
+  }
+
+  return [parent.key, ...findAllParent(menuItems, parent, visited)];
 };
 
 export const getMenuItemFromURL = (

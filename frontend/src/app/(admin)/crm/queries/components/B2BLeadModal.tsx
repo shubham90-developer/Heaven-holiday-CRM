@@ -4,51 +4,126 @@ import { Icon } from "@iconify/react";
 import React, { useState } from "react";
 import { Button, Modal, Form, Row, Col } from "react-bootstrap";
 
-const leadSources = [
-  { value: "4513", label: "Agency" },
-  { value: "4514", label: "Website" },
-  { value: "4515", label: "Facebook" },
-  { value: "4516", label: "Tripsgateway" },
-  { value: "4517", label: "Website B2B" },
-  { value: "4518", label: "Proposal" },
-  { value: "4519", label: "GTX Network" },
-  { value: "4520", label: "GTX Network Web" },
-  { value: "6888", label: "Instagram" },
-  { value: "8412", label: "Old Customer" },
-  { value: "8413", label: "Reference" },
-  { value: "8414", label: "Walk-in" },
-  { value: "8569", label: "RAJ SIR" },
-  { value: "8570", label: "My Old Client" },
-  { value: "8571", label: "Raj Sir Facebook" },
-  { value: "8572", label: "3700" },
-  { value: "8573", label: "AHH" },
-  { value: "9102", label: "Expo Belavagi" },
-  { value: "9116", label: "Expo Kolhapur" },
-  { value: "9117", label: "Expo Sangli" },
-  { value: "9288", label: "PUNE EXPO" },
-  { value: "9345", label: "PRANAV SIR" },
-  { value: "9346", label: "PRAJWAL SIR" },
-  { value: "9347", label: "SANKET SIR" },
-  { value: "9348", label: "SAIPRASAD SIR" },
-  { value: "9349", label: "JUST DIAL" },
-  { value: "9813", label: "KASTURI GROUP" },
-  { value: "9817", label: "Pune Expo Jan 2026" },
-  { value: "9917", label: "Varsha Bugade" },
-  { value: "9940", label: "PRANEETA BUGADE" },
-  { value: "9954", label: "Sangli Agri Pandhari" },
-];
+import { useGetAllLeadSourcesQuery } from "../../../../../../Redux/leadSourcesApi";
+import { useCreateLeadMutation } from "../../../../../../Redux/leadApi";
 
 interface Props {
   onSuccess?: () => void;
 }
 
 const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
-  const [show, setShow] = useState<boolean>(false);
-  const [type, setType] = useState("agency");
+  const [show, setShow] = useState(false);
   const [showMore, setShowMore] = useState(false);
-  const [leadSource, setLeadSource] = useState<string>("");
+
+  const [createLead, { isLoading }] = useCreateLeadMutation();
+
+  // ───────────────── LEAD SOURCES ─────────────────
+  const { data: leadSourceData } = useGetAllLeadSourcesQuery({
+    status: true,
+    page: 1,
+    limit: 100,
+  });
+
+  // ───────────────── FORM STATE ─────────────────
+  const [formData, setFormData] = useState({
+    type: "B2B" as const,
+    agentType: "Agency" as "Agency" | "Corporate",
+
+    companyName: "",
+
+    salutation: "",
+    firstName: "",
+    lastName: "",
+
+    phone: "",
+    email: "",
+
+    leadSource: "",
+
+    remarks: "",
+  });
+
+  // ───────────────── HANDLERS ─────────────────
   const handleClose = () => setShow(false);
+
   const handleShow = () => setShow(true);
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  // ───────────────── SUBMIT ─────────────────
+  const handleSubmit = async () => {
+    try {
+      if (!formData.companyName) {
+        alert("Company name is required");
+        return;
+      }
+
+      if (!formData.phone) {
+        alert("Phone number is required");
+        return;
+      }
+
+      if (!formData.leadSource) {
+        alert("Lead source is required");
+        return;
+      }
+
+      await createLead({
+        type: "B2B",
+        agentType: formData.agentType,
+
+        companyName: formData.companyName,
+
+        salutation: formData.salutation || undefined,
+        firstName: formData.firstName || undefined,
+        lastName: formData.lastName || undefined,
+
+        phone: formData.phone,
+        email: formData.email || undefined,
+
+        leadSource: formData.leadSource,
+
+        remarks: formData.remarks || undefined,
+      }).unwrap();
+
+      alert("Lead created successfully");
+
+      handleClose();
+
+      setFormData({
+        type: "B2B",
+        agentType: "Agency",
+
+        companyName: "",
+
+        salutation: "",
+        firstName: "",
+        lastName: "",
+
+        phone: "",
+        email: "",
+
+        leadSource: "",
+
+        remarks: "",
+      });
+
+      onSuccess?.();
+    } catch (error: any) {
+      console.error(error);
+
+      alert(error?.data?.message || "Something went wrong while creating lead");
+    }
+  };
 
   return (
     <>
@@ -63,7 +138,7 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
       </Button>
 
       <Modal show={show} onHide={handleClose} size="lg" centered>
-        {/* Header */}
+        {/* HEADER */}
         <Modal.Header
           style={{ background: "#274c6b", color: "#fff" }}
           className="d-flex justify-content-between"
@@ -84,10 +159,10 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
           </button>
         </Modal.Header>
 
-        {/* Body */}
+        {/* BODY */}
         <Modal.Body>
           <Form>
-            {/* Type + Company */}
+            {/* TYPE + COMPANY */}
             <Row className="mb-1 align-items-center">
               <Col md={6}>
                 <Form.Label
@@ -96,20 +171,32 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                 >
                   Type :
                 </Form.Label>
+
                 <div className="d-flex gap-3">
                   <Form.Check
                     type="radio"
                     label="Agency"
-                    checked={type === "agency"}
-                    onChange={() => setType("agency")}
+                    checked={formData.agentType === "Agency"}
+                    onChange={() =>
+                      setFormData({
+                        ...formData,
+                        agentType: "Agency",
+                      })
+                    }
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   />
+
                   <Form.Check
                     type="radio"
                     label="Corporate"
-                    checked={type === "corporate"}
-                    onChange={() => setType("corporate")}
+                    checked={formData.agentType === "Corporate"}
+                    onChange={() =>
+                      setFormData({
+                        ...formData,
+                        agentType: "Corporate",
+                      })
+                    }
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   />
@@ -124,12 +211,19 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   >
                     Company Name *
                   </Form.Label>
-                  <Form.Control type="text" style={{ fontSize: "10px" }} />
+
+                  <Form.Control
+                    type="text"
+                    name="companyName"
+                    value={formData.companyName}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
+                  />
                 </Form.Group>
               </Col>
             </Row>
 
-            {/* Email + Name */}
+            {/* EMAIL + NAME */}
             <Row className="mb-1">
               <Col md={6}>
                 <Form.Group>
@@ -137,10 +231,14 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   >
-                    Email Id *
+                    Email Id
                   </Form.Label>
+
                   <Form.Control
                     type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
                     placeholder="Email Id"
                     style={{ fontSize: "10px" }}
                   />
@@ -155,14 +253,19 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   >
                     Salutation
                   </Form.Label>
-                  <Form.Select style={{ fontSize: "10px" }}>
-                    <option>Select</option>
-                    <option>Mr.</option>
-                    <option>Ms.</option>
-                    <option>Mrs.</option>
-                    <option>Miss.</option>
-                    <option>Dr.</option>
-                    <option>Prof.</option>
+
+                  <Form.Select
+                    name="salutation"
+                    value={formData.salutation}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
+                  >
+                    <option value="">Select</option>
+                    <option value="Mr">Mr</option>
+                    <option value="Mrs">Mrs</option>
+                    <option value="Ms">Ms</option>
+                    <option value="Dr">Dr</option>
+                    <option value="Prof">Prof</option>
                   </Form.Select>
                 </Form.Group>
               </Col>
@@ -175,12 +278,19 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   >
                     First Name
                   </Form.Label>
-                  <Form.Control type="text" style={{ fontSize: "10px" }} />
+
+                  <Form.Control
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
+                  />
                 </Form.Group>
               </Col>
             </Row>
 
-            {/* Last Name + Mobile */}
+            {/* LAST NAME + MOBILE */}
             <Row className="mb-1">
               <Col md={6}>
                 <Form.Group>
@@ -190,13 +300,21 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   >
                     Last Name
                   </Form.Label>
-                  <Form.Control type="text" style={{ fontSize: "10px" }} />
+
+                  <Form.Control
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
+                  />
                 </Form.Group>
               </Col>
 
               <Col md={2}>
                 <Form.Group>
                   <Form.Label>&nbsp;</Form.Label>
+
                   <Form.Control
                     value="+91"
                     readOnly
@@ -213,46 +331,40 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   >
                     Mobile Number *
                   </Form.Label>
-                  <Form.Control type="text" style={{ fontSize: "10px" }} />
+
+                  <Form.Control
+                    type="text"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
+                  />
                 </Form.Group>
               </Col>
             </Row>
 
-            {/* RM + Lead Source */}
+            {/* LEAD SOURCE */}
             <Row className="mb-1">
-              <Col md={6}>
+              <Col md={12}>
                 <Form.Group>
                   <Form.Label
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   >
-                    RM
+                    Lead Source *
                   </Form.Label>
-                  <Form.Select style={{ fontSize: "10px" }}>
-                    <option>RAJENDRA BUGADE</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
 
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label
-                    style={{ fontSize: "10px" }}
-                    className="text-primary"
-                  >
-                    Lead Source
-                  </Form.Label>
                   <Form.Select
-                    size="sm"
-                    value={leadSource}
-                    onChange={(e) => setLeadSource(e.target.value)}
-                    style={{ fontSize: "12px" }}
+                    name="leadSource"
+                    value={formData.leadSource}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px" }}
                   >
                     <option value="">Select Lead Source</option>
 
-                    {leadSources.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
+                    {leadSourceData?.data?.map((item) => (
+                      <option key={item._id} value={item._id}>
+                        {item.leadSourceName}
                       </option>
                     ))}
                   </Form.Select>
@@ -260,113 +372,47 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
               </Col>
             </Row>
 
-            {/* Show More Toggle */}
+            {/* SHOW MORE */}
             <div
               className="mb-2"
-              style={{ color: "#ff6600", cursor: "pointer", fontSize: "10px" }}
+              style={{
+                color: "#ff6600",
+                cursor: "pointer",
+                fontSize: "10px",
+              }}
               onClick={() => setShowMore(!showMore)}
             >
               {showMore ? "Show Less" : "Show More"}
             </div>
 
-            {/* Extra Fields */}
+            {/* EXTRA */}
             {showMore && (
-              <>
-                <Row className="mb-1">
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label
-                        style={{ fontSize: "10px" }}
-                        className="text-primary"
-                      >
-                        Country
-                      </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
-                    </Form.Group>
-                  </Col>
+              <Row className="mb-1">
+                <Col md={12}>
+                  <Form.Group>
+                    <Form.Label
+                      style={{ fontSize: "10px" }}
+                      className="text-primary"
+                    >
+                      Remarks
+                    </Form.Label>
 
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label
-                        style={{ fontSize: "10px" }}
-                        className="text-primary"
-                      >
-                        State
-                      </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
-                    </Form.Group>
-                  </Col>
-                </Row>
-
-                <Row className="mb-1">
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label
-                        style={{ fontSize: "10px" }}
-                        className="text-primary"
-                      >
-                        City
-                      </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
-                    </Form.Group>
-                  </Col>
-
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label
-                        style={{ fontSize: "10px" }}
-                        className="text-primary"
-                      >
-                        Area
-                      </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
-                    </Form.Group>
-                  </Col>
-                </Row>
-
-                <Row className="mb-1">
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label
-                        style={{ fontSize: "10px" }}
-                        className="text-primary"
-                      >
-                        Pincode
-                      </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
-                    </Form.Group>
-                  </Col>
-
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label
-                        style={{ fontSize: "10px" }}
-                        className="text-primary"
-                      >
-                        Address
-                      </Form.Label>
-                      <Form.Control type="text" style={{ fontSize: "10px" }} />
-                    </Form.Group>
-                  </Col>
-                </Row>
-              </>
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      name="remarks"
+                      value={formData.remarks}
+                      onChange={handleChange}
+                      style={{ fontSize: "10px" }}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
             )}
-
-            {/* Remarks */}
-            <Form.Group>
-              <Form.Label style={{ fontSize: "10px" }} className="text-primary">
-                Remarks
-              </Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                style={{ fontSize: "10px" }}
-              />
-            </Form.Group>
           </Form>
         </Modal.Body>
 
-        {/* Footer */}
+        {/* FOOTER */}
         <Modal.Footer>
           <Button
             variant="outline-danger"
@@ -375,8 +421,14 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
           >
             Cancel
           </Button>
-          <Button variant="success" style={{ fontSize: "10px" }}>
-            Submit
+
+          <Button
+            variant="success"
+            onClick={handleSubmit}
+            disabled={isLoading}
+            style={{ fontSize: "10px" }}
+          >
+            {isLoading ? "Submitting..." : "Submit"}
           </Button>
         </Modal.Footer>
       </Modal>

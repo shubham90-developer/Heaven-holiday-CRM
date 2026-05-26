@@ -4,64 +4,34 @@ import { Icon } from "@iconify/react";
 import React, { useState } from "react";
 import { Button, Modal, Form, Row, Col } from "react-bootstrap";
 import { useCreateLeadMutation } from "../../../../../../Redux/leadApi";
-
-const leadSources = [
-  { value: "4513", label: "Agency" },
-  { value: "4514", label: "Website" },
-  { value: "4515", label: "Facebook" },
-  { value: "4516", label: "Tripsgateway" },
-  { value: "4517", label: "Website B2B" },
-  { value: "4518", label: "Proposal" },
-  { value: "4519", label: "GTX Network" },
-  { value: "4520", label: "GTX Network Web" },
-  { value: "6888", label: "Instagram" },
-  { value: "8412", label: "Old Customer" },
-  { value: "8413", label: "Reference" },
-  { value: "8414", label: "Walk-in" },
-  { value: "8569", label: "RAJ SIR" },
-  { value: "8570", label: "My Old Client" },
-  { value: "8571", label: "Raj Sir Facebook" },
-  { value: "8572", label: "3700" },
-  { value: "8573", label: "AHH" },
-  { value: "9102", label: "Expo Belavagi" },
-  { value: "9116", label: "Expo Kolhapur" },
-  { value: "9117", label: "Expo Sangli" },
-  { value: "9288", label: "PUNE EXPO" },
-  { value: "9345", label: "PRANAV SIR" },
-  { value: "9346", label: "PRAJWAL SIR" },
-  { value: "9347", label: "SANKET SIR" },
-  { value: "9348", label: "SAIPRASAD SIR" },
-  { value: "9349", label: "JUST DIAL" },
-  { value: "9813", label: "KASTURI GROUP" },
-  { value: "9817", label: "Pune Expo Jan 2026" },
-  { value: "9917", label: "Varsha Bugade" },
-  { value: "9940", label: "PRANEETA BUGADE" },
-  { value: "9954", label: "Sangli Agri Pandhari" },
-];
+import { useGetAllLeadSourcesQuery } from "../../../../../../Redux/leadSourcesApi";
 
 interface Props {
   onSuccess?: () => void;
 }
 
 const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
-  const [show, setShow] = useState<boolean>(false);
-  const [type, setType] = useState("agency");
+  const [show, setShow] = useState(false);
+  const [agentType, setAgentType] = useState<"Agency" | "Corporate">("Agency");
   const [showMore, setShowMore] = useState(false);
-  const [leadSource, setLeadSource] = useState<string>("");
-  const [companyName, setCompanyName] = useState<string>("");
-  const [salutation, setSalutation] = useState<string>("");
-  const [firstName, setFirstName] = useState<string>("");
-  const [lastName, setLastName] = useState<string>("");
-  const [email, setEmail] = useState<string>("");
-  const [phone, setPhone] = useState<string>("");
-  const [remarks, setRemarks] = useState<string>("");
-  const [error, setError] = useState<string>("");
+  const [leadSource, setLeadSource] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [salutation, setSalutation] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [error, setError] = useState("");
 
   const [createLead, { isLoading }] = useCreateLeadMutation();
+  const { data: leadSourcesData } = useGetAllLeadSourcesQuery({});
+  const leadSources = leadSourcesData?.data ?? [];
 
   const handleClose = () => {
     setShow(false);
     setError("");
+    setAgentType("Agency");
     setCompanyName("");
     setFirstName("");
     setLastName("");
@@ -74,22 +44,24 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
   };
 
   const handleSubmit = async () => {
-    if (!companyName || !phone) {
-      setError("Company Name and Mobile Number are required.");
+    if (!companyName || !phone || !leadSource) {
+      setError("Company Name, Mobile Number and Lead Source are required.");
       return;
     }
     try {
       await createLead({
-        customerName:
-          `${salutation} ${firstName} ${lastName}`.trim() || companyName,
+        type: "B2B",
+        agentType,
         companyName,
+        salutation: salutation || undefined,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
         email: email || undefined,
         phone,
-        type: "B2B",
-        source: leadSource || "Agency",
+        leadSource, // ← ObjectId from leadSourcesApi
         leadStage: "new",
         status: "unassigned",
-        remark: remarks || undefined,
+        remarks: remarks || undefined,
       }).unwrap();
       handleClose();
       onSuccess?.();
@@ -141,6 +113,7 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
               {error}
             </div>
           )}
+
           <Form>
             {/* Type + Company */}
             <Row className="mb-1 align-items-center">
@@ -155,16 +128,16 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   <Form.Check
                     type="radio"
                     label="Agency"
-                    checked={type === "agency"}
-                    onChange={() => setType("agency")}
+                    checked={agentType === "Agency"}
+                    onChange={() => setAgentType("Agency")}
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   />
                   <Form.Check
                     type="radio"
                     label="Corporate"
-                    checked={type === "corporate"}
-                    onChange={() => setType("corporate")}
+                    checked={agentType === "Corporate"}
+                    onChange={() => setAgentType("Corporate")}
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   />
@@ -189,7 +162,7 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
               </Col>
             </Row>
 
-            {/* Email + Name */}
+            {/* Email + Salutation + First Name */}
             <Row className="mb-1">
               <Col md={6}>
                 <Form.Group>
@@ -223,12 +196,11 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                     onChange={(e) => setSalutation(e.target.value)}
                   >
                     <option value="">Select</option>
-                    <option>Mr.</option>
-                    <option>Ms.</option>
-                    <option>Mrs.</option>
-                    <option>Miss.</option>
-                    <option>Dr.</option>
-                    <option>Prof.</option>
+                    <option>Mr</option>
+                    <option>Ms</option>
+                    <option>Mrs</option>
+                    <option>Dr</option>
+                    <option>Prof</option>
                   </Form.Select>
                 </Form.Group>
               </Col>
@@ -299,7 +271,7 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
               </Col>
             </Row>
 
-            {/* Lead Source */}
+            {/* Lead Source — from API */}
             <Row className="mb-1">
               <Col md={12}>
                 <Form.Group>
@@ -307,7 +279,7 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                     style={{ fontSize: "10px" }}
                     className="text-primary"
                   >
-                    Lead Source
+                    Lead Source *
                   </Form.Label>
                   <Form.Select
                     size="sm"
@@ -316,9 +288,11 @@ const B2BLeadModal: React.FC<Props> = ({ onSuccess }) => {
                     style={{ fontSize: "12px" }}
                   >
                     <option value="">Select Lead Source</option>
-                    {leadSources.map((item) => (
-                      <option key={item.value} value={item.label}>
-                        {item.label}
+                    {leadSources.map((src) => (
+                      <option key={src._id} value={src._id}>
+                        {" "}
+                        {/* ← _id as value */}
+                        {src.leadSourceName}
                       </option>
                     ))}
                   </Form.Select>

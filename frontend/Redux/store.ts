@@ -16,6 +16,10 @@ import { guideApi } from "./guideApi";
 import { visaApi } from "./visaApi";
 import { itineraryApi } from "./itenaryApi";
 import { areaApi } from "./areaApi";
+import { companyProfileApi } from "./company-profileApi";
+import { termsConditionsApi } from "./terms-conditionsApi";
+import { emailTemplateApi } from "./email-templateApi";
+import { leadSourceApi } from "./leadSourcesApi";
 export const store = configureStore({
   reducer: {
     [roleApi.reducerPath]: roleApi.reducer,
@@ -36,6 +40,10 @@ export const store = configureStore({
     [visaApi.reducerPath]: visaApi.reducer,
     [itineraryApi.reducerPath]: itineraryApi.reducer,
     [areaApi.reducerPath]: areaApi.reducer,
+    [companyProfileApi.reducerPath]: companyProfileApi.reducer,
+    [termsConditionsApi.reducerPath]: termsConditionsApi.reducer,
+    [emailTemplateApi.reducerPath]: emailTemplateApi.reducer,
+    [leadSourceApi.reducerPath]: leadSourceApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
@@ -56,7 +64,11 @@ export const store = configureStore({
       .concat(guideApi.middleware)
       .concat(visaApi.middleware)
       .concat(itineraryApi.middleware)
-      .concat(areaApi.middleware),
+      .concat(areaApi.middleware)
+      .concat(companyProfileApi.middleware)
+      .concat(termsConditionsApi.middleware)
+      .concat(emailTemplateApi.middleware)
+      .concat(leadSourceApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

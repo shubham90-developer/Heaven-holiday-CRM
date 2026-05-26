@@ -12,20 +12,24 @@ import TouchPointsModal from "./TouchPointsModal";
 import ProposalModal from "./ProposalModal";
 import {
   useGetAllQueriesQuery,
-  useGetQueryCountsQuery,
+  useGetQueriesByLeadQuery,
   useUpdateQueryMutation,
+  useUpdateQueryStatusMutation,
+  useDeleteQueryMutation,
   IQuery,
+  QueryStatus,
+  RequirementType,
 } from "../../../../../../Redux/queryApi";
 import { useGetAllStaffQuery } from "../../../../../../Redux/staffApi";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
-const STAGE_OPTIONS = [
-  { value: "queryCreated", label: "Query Created" },
-  { value: "proposalPending", label: "Proposal Pending" },
-  { value: "proposalSent", label: "Proposal Sent" },
+const STATUS_OPTIONS: { value: QueryStatus; label: string }[] = [
+  { value: "new", label: "New" },
+  { value: "inProcess", label: "In Process" },
   { value: "confirmed", label: "Confirmed" },
   { value: "rejected", label: "Rejected" },
+  { value: "lost", label: "Lost" },
 ];
 
 const TEMPERATURE_OPTIONS = [
@@ -36,17 +40,15 @@ const TEMPERATURE_OPTIONS = [
 ];
 
 /**
- * Maps UI tab keys → backend `stage` query param.
- * undefined  = don't send the stage filter (show all stages).
- * "null"     = special value the backend treats as assignedSales IS NULL.
+ * Maps UI tab keys → backend `status` query param.
+ * undefined = no status filter (show all).
  */
-const TAB_STAGE_MAP: Record<string, string | undefined> = {
-  inProcess: "queryCreated", // shows only queryCreated stage
-  recent: undefined, // no stage filter – rely on sort
+const TAB_STATUS_MAP: Record<string, QueryStatus | undefined> = {
+  inProcess: "inProcess",
+  new: "new",
   confirmed: "confirmed",
   rejected: "rejected",
-  unAssigned: undefined, // filtered by assignedSales=null on backend
-  callBack: undefined,
+  lost: "lost",
   overall: undefined,
 };
 
@@ -68,6 +70,53 @@ const getTimeAgo = (dateStr: string) => {
   return `${hours}H ${mins}M`;
 };
 
+/**
+ * Extracts a readable destination string from whichever
+ * sub-schema is populated on the query.
+ */
+const getDestination = (query: IQuery): string => {
+  if (query.packageInfo?.goingTo) return query.packageInfo.goingTo;
+  if (query.flightInfo?.destinationCity)
+    return query.flightInfo.destinationCity;
+  if (query.transferInfo?.goingTo) return query.transferInfo.goingTo ?? "";
+  if (query.hotelInfo?.destination) return query.hotelInfo.destination;
+  if (query.sightseeingInfo?.destination)
+    return query.sightseeingInfo.destination ?? "";
+  if (query.miscellaneousInfo?.destination)
+    return query.miscellaneousInfo.destination ?? "";
+  return query.goingTo ?? "NA";
+};
+
+/**
+ * Extracts a readable traveler count from whichever sub-schema is populated.
+ */
+const getTravelers = (query: IQuery): number | string => {
+  if (query.packageInfo?.travelers) return query.packageInfo.travelers;
+  if (query.flightInfo) {
+    const { adults = 0, children = 0, infants = 0 } = query.flightInfo;
+    return adults + children + infants;
+  }
+  if (query.transferInfo?.travelers) return query.transferInfo.travelers ?? "—";
+  if (query.hotelInfo?.travelers) return query.hotelInfo.travelers;
+  if (query.sightseeingInfo) {
+    const { adults = 0, children = 0 } = query.sightseeingInfo;
+    return adults + children;
+  }
+  return "—";
+};
+
+/**
+ * Extracts a secondary descriptor (queryType, tripType, mode, etc.)
+ * for the Description column.
+ */
+const getSubType = (query: IQuery): string => {
+  if (query.packageInfo?.queryType) return query.packageInfo.queryType;
+  if (query.flightInfo?.tripType) return query.flightInfo.tripType ?? "";
+  if (query.transferInfo?.mode) return query.transferInfo.mode ?? "";
+  if (query.visaInfo?.visaCategory) return query.visaInfo.visaCategory ?? "";
+  return "";
+};
+
 // ─── COMPONENT ───────────────────────────────────────────────────────────────
 
 const Queries = () => {
@@ -84,10 +133,8 @@ const Queries = () => {
 
   // ── Build query params from UI state ──────────────────────────────────────
   const queryParams = {
-    stage: TAB_STAGE_MAP[activeTab],
-    temperature: temperature || undefined,
-    // "null" string → backend converts to { assignedSales: null } filter
-    assignedSales: activeTab === "unAssigned" ? "null" : undefined,
+    status: TAB_STATUS_MAP[activeTab],
+    createdBy: undefined as string | undefined, // extend if you add a "mine" tab
     page,
     limit: 20,
   };
@@ -99,21 +146,19 @@ const Queries = () => {
     refetch,
   } = useGetAllQueriesQuery(queryParams);
 
-  const { data: countsData } = useGetQueryCountsQuery();
   const { data: staffData } = useGetAllStaffQuery({ archived: false });
   const [updateQuery] = useUpdateQueryMutation();
+  const [updateStatus] = useUpdateQueryStatusMutation();
+  const [deleteQuery] = useDeleteQueryMutation();
 
-  const counts = countsData?.data;
   const staffList = staffData?.data ?? [];
 
   // ── Accumulate pages; reset when tab / filters change ────────────────────
   useEffect(() => {
     if (!queriesData?.data) return;
     if (page === 1) {
-      // First page (or filter reset) → replace list
       setAllQueries(queriesData.data);
     } else {
-      // Subsequent pages → append, deduplicate by _id
       setAllQueries((prev) => {
         const existingIds = new Set(prev.map((q) => q._id));
         const newRows = queriesData.data.filter((q) => !existingIds.has(q._id));
@@ -122,23 +167,21 @@ const Queries = () => {
     }
   }, [queriesData]);
 
-  // Reset accumulated list and page when tab or temperature changes
+  // Reset accumulated list and page when tab / temperature changes
   useEffect(() => {
     setAllQueries([]);
     setPage(1);
     setSelectedIds([]);
   }, [activeTab, temperature]);
 
-  // ── Client-side search filter (name / queryNumber / destination) ──────────
+  // ── Client-side search filter (customerName / destination) ───────────────
   const filtered = search
-    ? allQueries.filter(
-        (q) =>
-          q.leadId?.customerName
-            ?.toLowerCase()
-            .includes(search.toLowerCase()) ||
-          q.queryNumber?.includes(search) ||
-          q.goingTo?.toLowerCase().includes(search.toLowerCase()),
-      )
+    ? allQueries.filter((q) => {
+        const name = q.lead?.customerName?.toLowerCase() ?? "";
+        const dest = getDestination(q).toLowerCase();
+        const term = search.toLowerCase();
+        return name.includes(term) || dest.includes(term);
+      })
     : allQueries;
 
   // ── Selection helpers ────────────────────────────────────────────────────
@@ -152,57 +195,73 @@ const Queries = () => {
       selectedIds.length === filtered.length ? [] : filtered.map((q) => q._id),
     );
 
-  // ── Stage change (single row) ────────────────────────────────────────────
-  const handleStageChange = async (id: string, stage: string) => {
-    await updateQuery({ id, body: { stage: stage as any } });
-    // invalidatesTags: ["Query"] on updateQuery auto-refetches all Query endpoints
+  // ── Status change (single row) ───────────────────────────────────────────
+  const handleStatusChange = async (id: string, status: string) => {
+    await updateStatus({ id, body: { status: status as QueryStatus } });
   };
 
-  // ── Bulk assign sales ────────────────────────────────────────────────────
+  // ── Bulk assign sales (stored inside the relevant sub-schema) ────────────
+  // Since assignToSales lives inside each sub-schema, we use updateQuery
+  // with the appropriate info field. For a bulk operation we patch the
+  // common createdBy field as a proxy — adjust to your actual needs.
   const handleBulkAssignSales = async () => {
     if (!selectedSales || selectedIds.length === 0) return;
     await Promise.all(
-      selectedIds.map((id) =>
-        updateQuery({ id, body: { assignedSales: selectedSales } }),
-      ),
+      selectedIds.map((id) => {
+        const query = allQueries.find((q) => q._id === id);
+        if (!query) return Promise.resolve();
+        // patch the populated sub-schema's assignToSales
+        const infoKey = getInfoKey(query.requirementType);
+        const existing = (query as any)[infoKey] ?? {};
+        return updateQuery({
+          id,
+          body: {
+            requirementType: query.requirementType,
+            [infoKey]: { ...existing, assignToSales: selectedSales },
+          } as any,
+        });
+      }),
     );
     setSelectedIds([]);
     setSelectedSales("");
-    // RTK invalidatesTags handles refetch automatically
   };
 
-  // ── Bulk assign ops ──────────────────────────────────────────────────────
   const handleBulkAssignOps = async () => {
     if (!selectedOps || selectedIds.length === 0) return;
     await Promise.all(
-      selectedIds.map((id) =>
-        updateQuery({ id, body: { assignedOps: selectedOps } }),
-      ),
+      selectedIds.map((id) => {
+        const query = allQueries.find((q) => q._id === id);
+        if (!query) return Promise.resolve();
+        const infoKey = getInfoKey(query.requirementType);
+        const existing = (query as any)[infoKey] ?? {};
+        return updateQuery({
+          id,
+          body: {
+            requirementType: query.requirementType,
+            [infoKey]: { ...existing, assignToOps: true },
+          } as any,
+        });
+      }),
     );
     setSelectedIds([]);
     setSelectedOps("");
   };
 
-  // ── Archive selected (set archived: true) ────────────────────────────────
-  const handleArchiveSelected = async () => {
+  // ── Delete selected ──────────────────────────────────────────────────────
+  const handleDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
-    await Promise.all(
-      selectedIds.map((id) =>
-        updateQuery({ id, body: { archived: true } as any }),
-      ),
-    );
+    await Promise.all(selectedIds.map((id) => deleteQuery(id)));
     setSelectedIds([]);
   };
 
   // ── Tabs config ──────────────────────────────────────────────────────────
   const tabs = [
-    { key: "inProcess", label: "In Process", count: counts?.inProgress ?? 0 },
-    { key: "recent", label: "Recent", count: 0 },
-    { key: "confirmed", label: "Confirmed", count: counts?.confirmed ?? 0 },
-    { key: "rejected", label: "Rejected", count: counts?.rejected ?? 0 },
-    { key: "unAssigned", label: "Un Assigned", count: counts?.unAssigned ?? 0 },
-    { key: "callBack", label: "Call Back", count: 0 },
-    { key: "overall", label: "Overall", count: 0 },
+    { key: "inProcess", label: "In Process" },
+    { key: "new", label: "New" },
+    { key: "confirmed", label: "Confirmed" },
+    { key: "rejected", label: "Rejected" },
+    { key: "lost", label: "Lost" },
+    { key: "overall", label: "Overall" },
   ];
 
   const total = queriesData?.pagination?.total ?? 0;
@@ -296,13 +355,13 @@ const Queries = () => {
             <Col lg={8}>
               <div className="d-flex align-items-center gap-2 flex-wrap">
                 <Button
-                  variant="outline-primary"
+                  variant="outline-danger"
                   size="sm"
                   style={{ fontSize: "10px", fontWeight: "600" }}
                   disabled={selectedIds.length === 0}
-                  onClick={handleArchiveSelected}
+                  onClick={handleDeleteSelected}
                 >
-                  Archive
+                  Delete
                 </Button>
 
                 {TEMPERATURE_OPTIONS.map((t) => (
@@ -329,7 +388,7 @@ const Queries = () => {
               <input
                 type="search"
                 className="form-control"
-                placeholder="Search name, query no, destination..."
+                placeholder="Search name, destination..."
                 style={{ fontSize: "10px" }}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -351,11 +410,6 @@ const Queries = () => {
                   onClick={() => setActiveTab(tab.key)}
                 >
                   {tab.label}
-                  {tab.count > 0 && (
-                    <span className="badge bg-light text-dark ms-1">
-                      {tab.count}
-                    </span>
-                  )}
                 </Button>
               ))}
             </div>
@@ -415,9 +469,9 @@ const Queries = () => {
                   <th style={{ width: "90px" }}>Travel Date</th>
                   <th style={{ width: "100px" }}>Destinations</th>
                   <th style={{ width: "150px" }}>Proposal</th>
-                  <th style={{ width: "160px" }}>Lead Stage</th>
+                  <th style={{ width: "160px" }}>Query Status</th>
                   <th style={{ width: "120px" }}>Last Updated</th>
-                  <th style={{ width: "140px" }}>Owner</th>
+                  <th style={{ width: "140px" }}>Created By</th>
                   <th style={{ width: "70px" }} className="text-center">
                     Action
                   </th>
@@ -453,44 +507,41 @@ const Queries = () => {
                         <div className="text-muted">
                           {getTimeAgo(query.createdAt)}
                         </div>
-                        <div style={{ fontSize: "9px", color: "#666" }}>
-                          {query.queryNumber}
-                        </div>
                       </td>
 
                       {/* Customer Details */}
                       <td>
-                        {query.leadId?.customerName && (
+                        {query.lead?.customerName && (
                           <div className="fw-semibold">
                             <Icon icon="mdi:account" className="me-1" />
-                            {query.leadId.customerName}
+                            {query.lead.customerName}
                           </div>
                         )}
-                        {query.leadId?.phone && (
+                        {query.lead?.phone && (
                           <div>
                             <Icon icon="mdi:phone" className="me-1" />
-                            {query.leadId.phone}
+                            {query.lead.phone}
                           </div>
                         )}
-                        {query.leadId?.email && (
+                        {query.lead?.email && (
                           <div>
                             <Icon icon="mdi:email-outline" className="me-1" />
-                            {query.leadId.email}
+                            {query.lead.email}
                           </div>
                         )}
                       </td>
 
                       {/* Pax / Type */}
                       <td>
-                        <div>{query.travelers} Traveler(s)</div>
+                        <div>{getTravelers(query)} Traveler(s)</div>
                         <span
                           className={`badge ${
-                            query.leadId?.type === "B2B"
+                            query.lead?.type === "B2B"
                               ? "bg-warning text-dark"
                               : "bg-success"
                           }`}
                         >
-                          {query.leadId?.type ?? "B2C"}
+                          {query.lead?.type ?? "B2C"}
                         </span>
                       </td>
 
@@ -498,17 +549,17 @@ const Queries = () => {
                       <td>
                         <div>{query.requirementType}</div>
                         <div style={{ fontSize: "10px", color: "#666" }}>
-                          {query.queryType}
+                          {getSubType(query)}
                         </div>
                       </td>
 
                       {/* Travel Date */}
-                      <td>{formatDate(query.travelDate)}</td>
+                      <td>{formatDate(query.travelDate ?? undefined)}</td>
 
                       {/* Destinations */}
                       <td>
                         {query.goingFrom ? `${query.goingFrom} → ` : ""}
-                        {query.goingTo}
+                        {getDestination(query)}
                       </td>
 
                       {/* Proposal */}
@@ -516,18 +567,18 @@ const Queries = () => {
                         <ProposalModal queryId={query._id} />
                       </td>
 
-                      {/* Lead Stage */}
+                      {/* Query Status */}
                       <td>
                         <div className="mb-1">
                           <select
                             className="form-select form-select-sm w-auto"
                             style={{ fontSize: "10px" }}
-                            value={query.stage}
+                            value={query.status}
                             onChange={(e) =>
-                              handleStageChange(query._id, e.target.value)
+                              handleStatusChange(query._id, e.target.value)
                             }
                           >
-                            {STAGE_OPTIONS.map((opt) => (
+                            {STATUS_OPTIONS.map((opt) => (
                               <option key={opt.value} value={opt.value}>
                                 {opt.label}
                               </option>
@@ -536,16 +587,16 @@ const Queries = () => {
                         </div>
                         <div className="d-flex gap-1">
                           <FollowupModal
-                            leadId={query.leadId?._id ?? ""}
+                            leadId={query.lead?._id ?? ""}
                             queryId={query._id}
-                            customerName={query.leadId?.customerName ?? ""}
+                            customerName={query.lead?.customerName ?? ""}
                             customerType={
-                              (query.leadId?.type as "B2C" | "B2B") ?? "B2C"
+                              (query.lead?.type as "B2C" | "B2B") ?? "B2C"
                             }
                           />
                           <TouchPointsModal
                             queryId={query._id}
-                            customerName={query.leadId?.customerName ?? ""}
+                            customerName={query.lead?.customerName ?? ""}
                           />
                         </div>
                       </td>
@@ -553,11 +604,11 @@ const Queries = () => {
                       {/* Last Updated */}
                       <td>{formatDate(query.updatedAt)}</td>
 
-                      {/* Owner */}
+                      {/* Created By */}
                       <td>
-                        {query.assignedSales
-                          ? `${query.assignedSales.firstName} ${query.assignedSales.lastName}`
-                          : "Unassigned"}
+                        {query.createdBy
+                          ? `${query.createdBy.firstName} ${query.createdBy.lastName}`
+                          : "—"}
                       </td>
 
                       {/* Action */}
@@ -610,3 +661,18 @@ const Queries = () => {
 };
 
 export default Queries;
+
+// ─── util (module-level, not inside component) ───────────────────────────────
+
+function getInfoKey(requirementType: RequirementType): string {
+  const map: Record<RequirementType, string> = {
+    Package: "packageInfo",
+    Flight: "flightInfo",
+    Transfer: "transferInfo",
+    Visa: "visaInfo",
+    Hotel: "hotelInfo",
+    Sightseeing: "sightseeingInfo",
+    Miscellaneous: "miscellaneousInfo",
+  };
+  return map[requirementType];
+}

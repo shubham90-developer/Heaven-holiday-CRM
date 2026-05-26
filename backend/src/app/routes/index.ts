@@ -3,6 +3,7 @@ import { roleRouter } from '../modules/roles/roles.routes';
 import { deptRouter } from '../modules/department/dept.routes';
 import { staffRouter } from '../modules/staff/staff.routes';
 import { authRouter } from '../modules/auth/auth.routes';
+import { leadSourcesRouter } from '../modules/leadSource/lead.router';
 import { leadRouter } from '../modules/lead/lead.routes';
 import { queryRouter } from '../modules/query/query.routes';
 import { followupRouter } from '../modules/followUp/followUp.routes';
@@ -17,6 +18,9 @@ import { transportRatesRouter } from '../modules/transport-rates/t-rates.routes'
 import { visaRouter } from '../modules/visa/visa.routes';
 import { itenaryRouter } from '../modules/itenary/itenary.routes';
 import { areaRouter } from '../modules/area/area.routes';
+import { companyProfileRouter } from '../modules/company-profile/company.routes';
+import { termsConditionsRouter } from '../modules/T&C/t&c.routes';
+import { emailTemplateRouter } from '../modules/emailTemplate/email.routes';
 const router = Router();
 
 const moduleRoutes = [
@@ -39,6 +43,10 @@ const moduleRoutes = [
   { path: '/itineraries', route: itenaryRouter },
   { path: '/areas', route: areaRouter },
   { path: '/restaurants', route: areaRouter },
+  { path: '/company-profile', route: companyProfileRouter },
+  { path: '/terms-conditions', route: termsConditionsRouter },
+  { path: '/email-templates', route: emailTemplateRouter },
+  { path: '/lead-sources', route: leadSourcesRouter },
 ];
 
 moduleRoutes.forEach((route) => router.use(route.path, route.route));

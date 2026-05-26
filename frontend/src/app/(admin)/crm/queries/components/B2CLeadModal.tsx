@@ -2,41 +2,18 @@
 
 import { Icon } from "@iconify/react";
 import React, { useState } from "react";
-import { Button, Modal, Form, Row, Col, InputGroup } from "react-bootstrap";
+import {
+  Button,
+  Modal,
+  Form,
+  Row,
+  Col,
+  InputGroup,
+  Spinner,
+} from "react-bootstrap";
 
-const leadSources = [
-  { value: "4513", label: "Agency" },
-  { value: "4514", label: "Website" },
-  { value: "4515", label: "Facebook" },
-  { value: "4516", label: "Tripsgateway" },
-  { value: "4517", label: "Website B2B" },
-  { value: "4518", label: "Proposal" },
-  { value: "4519", label: "GTX Network" },
-  { value: "4520", label: "GTX Network Web" },
-  { value: "6888", label: "Instagram" },
-  { value: "8412", label: "Old Customer" },
-  { value: "8413", label: "Reference" },
-  { value: "8414", label: "Walk-in" },
-  { value: "8569", label: "RAJ SIR" },
-  { value: "8570", label: "My Old Client" },
-  { value: "8571", label: "Raj Sir Facebook" },
-  { value: "8572", label: "3700" },
-  { value: "8573", label: "AHH" },
-  { value: "9102", label: "Expo Belavagi" },
-  { value: "9116", label: "Expo Kolhapur" },
-  { value: "9117", label: "Expo Sangli" },
-  { value: "9288", label: "PUNE EXPO" },
-  { value: "9345", label: "PRANAV SIR" },
-  { value: "9346", label: "PRAJWAL SIR" },
-  { value: "9347", label: "SANKET SIR" },
-  { value: "9348", label: "SAIPRASAD SIR" },
-  { value: "9349", label: "JUST DIAL" },
-  { value: "9813", label: "KASTURI GROUP" },
-  { value: "9817", label: "Pune Expo Jan 2026" },
-  { value: "9917", label: "Varsha Bugade" },
-  { value: "9940", label: "PRANEETA BUGADE" },
-  { value: "9954", label: "Sangli Agri Pandhari" },
-];
+import { useGetAllLeadSourcesQuery } from "../../../../../../Redux/leadSourcesApi";
+import { useCreateLeadMutation } from "../../../../../../Redux/leadApi";
 
 interface Props {
   onSuccess?: () => void;
@@ -44,9 +21,117 @@ interface Props {
 
 const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
   const [show, setShow] = useState<boolean>(false);
-  const [leadSource, setLeadSource] = useState<string>("");
-  const handleClose = () => setShow(false);
+
+  // ─── FORM STATE ─────────────────────────────────────
+  const [formData, setFormData] = useState({
+    salutation: "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    leadSource: "",
+    leadStage: "new",
+  });
+
+  // ─── API HOOKS ──────────────────────────────────────
+  const { data: leadSourceData, isLoading: leadSourceLoading } =
+    useGetAllLeadSourcesQuery({
+      status: true,
+      page: 1,
+      limit: 100,
+    });
+
+  const [createLead, { isLoading }] = useCreateLeadMutation();
+
+  // ─── MODAL ──────────────────────────────────────────
+  const handleClose = () => {
+    setShow(false);
+
+    setFormData({
+      salutation: "",
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      leadSource: "",
+      leadStage: "new",
+    });
+  };
+
   const handleShow = () => setShow(true);
+
+  // ─── INPUT CHANGE ───────────────────────────────────
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  // ─── SUBMIT ─────────────────────────────────────────
+  const handleSubmit = async () => {
+    try {
+      if (!formData.firstName) {
+        alert("First Name is required");
+        return;
+      }
+
+      if (!formData.phone) {
+        alert("Phone number is required");
+        return;
+      }
+
+      if (!formData.leadSource) {
+        alert("Lead Source is required");
+        return;
+      }
+
+      const payload = {
+        type: "B2C" as const,
+
+        salutation:
+          formData.salutation && formData.salutation !== "Select"
+            ? formData.salutation
+            : undefined,
+
+        firstName: formData.firstName,
+        lastName: formData.lastName || undefined,
+
+        email: formData.email || undefined,
+        phone: formData.phone,
+
+        leadSource: formData.leadSource,
+
+        leadStage: formData.leadStage as
+          | "new"
+          | "followUp"
+          | "confirmed"
+          | "rejected"
+          | "lost",
+
+        temperature: "no-status" as const,
+        status: "unassigned" as const,
+      };
+
+      await createLead(payload).unwrap();
+
+      alert("Lead created successfully");
+
+      handleClose();
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error: any) {
+      console.error(error);
+
+      alert(error?.data?.message || "Something went wrong while creating lead");
+    }
+  };
 
   return (
     <>
@@ -63,7 +148,7 @@ const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
 
       {/* MODAL */}
       <Modal show={show} onHide={handleClose} centered>
-        {/* Header */}
+        {/* HEADER */}
         <Modal.Header
           style={{ background: "#274c6b", color: "#fff" }}
           className="d-flex justify-content-between"
@@ -88,24 +173,28 @@ const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
         <Modal.Body>
           <Form>
             <Row className="g-1">
-              {/* Email */}
+              {/* EMAIL */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
                     className="text-primary"
                     style={{ fontSize: "10px" }}
                   >
-                    Email ID *
+                    Email ID
                   </Form.Label>
+
                   <Form.Control
                     type="email"
                     size="sm"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
                     style={{ fontSize: "10px", padding: "8px" }}
                   />
                 </Form.Group>
               </Col>
 
-              {/* Mobile */}
+              {/* MOBILE */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
@@ -115,17 +204,21 @@ const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
                     Mobile Number *
                   </Form.Label>
 
-                  <InputGroup size="sm" style={{ fontSize: "10px" }}>
+                  <InputGroup size="sm">
                     <InputGroup.Text>🇮🇳 +91</InputGroup.Text>
+
                     <Form.Control
                       type="text"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
                       style={{ fontSize: "10px", padding: "8px" }}
                     />
                   </InputGroup>
                 </Form.Group>
               </Col>
 
-              {/* Salutation + First Name */}
+              {/* SALUTATION */}
               <Col md={4}>
                 <Form.Group>
                   <Form.Label
@@ -134,20 +227,25 @@ const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   >
                     Salutation
                   </Form.Label>
+
                   <Form.Select
                     size="sm"
+                    name="salutation"
+                    value={formData.salutation}
+                    onChange={handleChange}
                     style={{ fontSize: "10px", padding: "8px" }}
                   >
-                    <option>Select</option>
-                    <option>Mr.</option>
-                    <option>Ms.</option>
-                    <option>Mrs.</option>
-                    <option>Miss</option>
-                    <option>Dr.</option>
+                    <option value="">Select</option>
+                    <option value="Mr">Mr</option>
+                    <option value="Ms">Ms</option>
+                    <option value="Mrs">Mrs</option>
+                    <option value="Dr">Dr</option>
+                    <option value="Prof">Prof</option>
                   </Form.Select>
                 </Form.Group>
               </Col>
 
+              {/* FIRST NAME */}
               <Col md={8}>
                 <Form.Group>
                   <Form.Label
@@ -156,14 +254,18 @@ const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   >
                     First Name *
                   </Form.Label>
+
                   <Form.Control
                     size="sm"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
                     style={{ fontSize: "10px", padding: "8px" }}
                   />
                 </Form.Group>
               </Col>
 
-              {/* Last Name */}
+              {/* LAST NAME */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
@@ -172,40 +274,50 @@ const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   >
                     Last Name
                   </Form.Label>
+
                   <Form.Control
                     size="sm"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
                     style={{ fontSize: "10px", padding: "8px" }}
                   />
                 </Form.Group>
               </Col>
 
-              {/* Lead Source */}
+              {/* LEAD SOURCE */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
                     className="text-primary"
                     style={{ fontSize: "10px" }}
                   >
-                    Lead Source
+                    Lead Source *
                   </Form.Label>
+
                   <Form.Select
                     size="sm"
-                    value={leadSource}
-                    onChange={(e) => setLeadSource(e.target.value)}
-                    style={{ fontSize: "12px" }}
+                    name="leadSource"
+                    value={formData.leadSource}
+                    onChange={handleChange}
+                    style={{ fontSize: "10px", padding: "8px" }}
                   >
                     <option value="">Select Lead Source</option>
 
-                    {leadSources.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
+                    {leadSourceLoading ? (
+                      <option>Loading...</option>
+                    ) : (
+                      leadSourceData?.data?.map((item) => (
+                        <option key={item._id} value={item._id}>
+                          {item.leadSourceName}
+                        </option>
+                      ))
+                    )}
                   </Form.Select>
                 </Form.Group>
               </Col>
 
-              {/* Lead Stage */}
+              {/* LEAD STAGE */}
               <Col md={12}>
                 <Form.Group>
                   <Form.Label
@@ -214,22 +326,19 @@ const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
                   >
                     Lead Stage
                   </Form.Label>
+
                   <Form.Select
                     size="sm"
+                    name="leadStage"
+                    value={formData.leadStage}
+                    onChange={handleChange}
                     style={{ fontSize: "10px", padding: "8px" }}
                   >
-                    <option value="">Select Stage</option>
-                    <option value="45">Wrong Number</option>
-                    <option value="48">Can not be Contacted</option>
-                    <option value="49">Not Interested</option>
-                    <option value="47">Junk Lead</option>
-                    <option value="51">Lost Lead</option>
-                    <option value="161">Duplicate</option>
-                    <option value="53">New</option>
-                    <option value="52">Call Back</option>
-                    <option value="159">Destination Closed</option>
-                    <option value="162">Unanswered</option>
-                    <option value="163">Not Reachable</option>
+                    <option value="new">New</option>
+                    <option value="followUp">Follow Up</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="lost">Lost</option>
                   </Form.Select>
                 </Form.Group>
               </Col>
@@ -248,8 +357,24 @@ const B2CLeadModal: React.FC<Props> = ({ onSuccess }) => {
             Cancel
           </Button>
 
-          <Button variant="success" size="sm" style={{ fontSize: "10px" }}>
-            <Icon icon="mdi:account-plus-outline" className="me-1" /> Submit
+          <Button
+            variant="success"
+            size="sm"
+            style={{ fontSize: "10px" }}
+            onClick={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-1" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Icon icon="mdi:account-plus-outline" className="me-1" />
+                Submit
+              </>
+            )}
           </Button>
         </Modal.Footer>
       </Modal>

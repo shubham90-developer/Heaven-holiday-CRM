@@ -4,24 +4,226 @@ import { Icon } from "@iconify/react/dist/iconify.js";
 import { useState } from "react";
 import {
   Button,
-  Modal,
   Card,
   Form,
   Row,
   Col,
   CardHeader,
-  NavItem,
   CardBody,
 } from "react-bootstrap";
 import TravelersField from "./TravelersField";
 import Sightseeing from "./Sightseeing";
 import Miscellaneous from "./Miscellaneous";
 import Hotel from "./Hotel";
-const NewQuery = () => {
-  const [open, setOpen] = useState(false);
-  const [requirementType, setRequirementType] = useState("package");
+import {
+  useCreateQueryMutation,
+  RequirementType,
+} from "../../../../../../Redux/queryApi";
+import { useGetAllStaffQuery } from "../../../../../../Redux/staffApi";
+
+// ─── PROPS ────────────────────────────────────────────────────────────────────
+
+interface NewQueryProps {
+  leadId: string;
+  onSuccess?: () => void;
+}
+
+// ─── COMPONENT ────────────────────────────────────────────────────────────────
+
+const NewQuery = ({ leadId, onSuccess }: NewQueryProps) => {
+  const [requirementType, setRequirementType] =
+    useState<RequirementType>("Package");
+  const [transferType, setTransferType] = useState<"Cab" | "Train">("Cab");
   const [showSelect, setShowSelect] = useState(false);
-  const [transferType, settransferType] = useState("Cab");
+
+  const [createQuery, { isLoading }] = useCreateQueryMutation();
+  const { data: staffData } = useGetAllStaffQuery({ archived: false });
+  const staffList = staffData?.data ?? [];
+
+  // ── common header fields ─────────────────────────────────────────────────
+  const [goingFrom, setGoingFrom] = useState("");
+  const [goingTo, setGoingTo] = useState("");
+  const [travelDate, setTravelDate] = useState("");
+
+  // ── Package ──────────────────────────────────────────────────────────────
+  const [pkgQueryType, setPkgQueryType] = useState<"FIT" | "GIT">("FIT");
+  const [pkgGoingTo, setPkgGoingTo] = useState("");
+  const [pkgGoingFrom, setPkgGoingFrom] = useState("");
+  const [pkgSpecificDate, setPkgSpecificDate] = useState("");
+  const [pkgNoOfDays, setPkgNoOfDays] = useState("");
+  const [pkgTravelers, setPkgTravelers] = useState("");
+  const [pkgPriceRange, setPkgPriceRange] = useState("");
+  const [pkgInclusions, setPkgInclusions] = useState("");
+  const [pkgTheme, setPkgTheme] = useState("");
+  const [pkgHotelPref, setPkgHotelPref] = useState<1 | 2 | 3 | 4 | 5>(3);
+  const [pkgAssignToOps, setPkgAssignToOps] = useState(false);
+
+  // ── Flight ───────────────────────────────────────────────────────────────
+  const [fltTripType, setFltTripType] = useState<
+    "OneWay" | "RoundTrip" | "MultiCity"
+  >("OneWay");
+  const [fltIsGroup, setFltIsGroup] = useState(false);
+  const [fltSource, setFltSource] = useState("");
+  const [fltDest, setFltDest] = useState("");
+  const [fltDepDate, setFltDepDate] = useState("");
+  const [fltAdults, setFltAdults] = useState(1);
+  const [fltChildren, setFltChildren] = useState(0);
+  const [fltInfants, setFltInfants] = useState(0);
+  const [fltClass, setFltClass] = useState<
+    "Economy" | "Business" | "First" | "PremiumEconomy"
+  >("Economy");
+  const [fltFareType, setFltFareType] = useState<
+    "Regular" | "Student" | "SeniorCitizen" | "Direct"
+  >("Regular");
+  const [fltAirline, setFltAirline] = useState("");
+  const [fltLeadSource, setFltLeadSource] = useState("");
+  const [fltAssignToSales, setFltAssignToSales] = useState("");
+  const [fltAssignToOps, setFltAssignToOps] = useState(false);
+  const [fltRemark, setFltRemark] = useState("");
+
+  // ── Transfer ─────────────────────────────────────────────────────────────
+  const [tfrTripType, setTfrTripType] = useState<"OneWay" | "RoundTrip">(
+    "OneWay",
+  );
+  const [tfrGoingTo, setTfrGoingTo] = useState("");
+  const [tfrGoingFrom, setTfrGoingFrom] = useState("");
+  const [tfrPickupDT, setTfrPickupDT] = useState("");
+  const [tfrNoOfDays, setTfrNoOfDays] = useState("");
+  const [tfrTravelers, setTfrTravelers] = useState("");
+  const [tfrPickupLoc, setTfrPickupLoc] = useState("");
+  const [tfrPreference, setTfrPreference] = useState("");
+  const [tfrLeadSource, setTfrLeadSource] = useState("");
+  const [tfrAssignToSales, setTfrAssignToSales] = useState("");
+  const [tfrAssignToOps, setTfrAssignToOps] = useState(false);
+  const [tfrRemark, setTfrRemark] = useState("");
+
+  // ── Visa ─────────────────────────────────────────────────────────────────
+  const [vsCountry, setVsCountry] = useState("");
+  const [vsCategory, setVsCategory] = useState("");
+  const [vsEntryType, setVsEntryType] = useState("");
+  const [vsDateOfTravel, setVsDateOfTravel] = useState("");
+  const [vsAdults, setVsAdults] = useState("");
+  const [vsChild, setVsChild] = useState("");
+  const [vsChildFamily, setVsChildFamily] = useState("");
+  const [vsInfant, setVsInfant] = useState("");
+  const [vsDuration, setVsDuration] = useState("");
+  const [vsNationality, setVsNationality] = useState("India");
+  const [vsLeadSource, setVsLeadSource] = useState("");
+  const [vsAssignToSales, setVsAssignToSales] = useState("");
+  const [vsAssignToOps, setVsAssignToOps] = useState(false);
+  const [vsRemark, setVsRemark] = useState("");
+
+  // ── SAVE HANDLERS (one per requirementType) ──────────────────────────────
+
+  const handleSavePackage = async () => {
+    const result = await createQuery({
+      lead: leadId,
+      requirementType: "Package",
+      goingFrom,
+      goingTo,
+      travelDate: travelDate || undefined,
+      packageInfo: {
+        queryType: pkgQueryType,
+        goingTo: pkgGoingTo || null,
+        goingFrom: pkgGoingFrom || null,
+        specificDate: pkgSpecificDate || null,
+        noOfDays: pkgNoOfDays ? Number(pkgNoOfDays) : null,
+        travelers: pkgTravelers ? Number(pkgTravelers) : null,
+        priceRange: pkgPriceRange || null,
+        inclusions: pkgInclusions || null,
+        theme: pkgTheme || null,
+        hotelPreference: pkgHotelPref,
+        assignToOps: pkgAssignToOps,
+      },
+    });
+    if ("data" in result) onSuccess?.();
+  };
+
+  const handleSaveFlight = async () => {
+    const result = await createQuery({
+      lead: leadId,
+      requirementType: "Flight",
+      goingFrom,
+      goingTo,
+      travelDate: travelDate || undefined,
+      flightInfo: {
+        tripType: fltTripType,
+        isGroup: fltIsGroup,
+        sourceCity: fltSource || null,
+        destinationCity: fltDest || null,
+        departureDate: fltDepDate || null,
+        adults: fltAdults,
+        children: fltChildren,
+        infants: fltInfants,
+        class: fltClass,
+        fareType: fltFareType,
+        preferredAirline: fltAirline || null,
+        leadSource: fltLeadSource || null,
+        assignToSales: fltAssignToSales || null,
+        assignToOps: fltAssignToOps,
+        addRemark: fltRemark || null,
+      },
+    });
+    if ("data" in result) onSuccess?.();
+  };
+
+  const handleSaveTransfer = async () => {
+    const result = await createQuery({
+      lead: leadId,
+      requirementType: "Transfer",
+      goingFrom,
+      goingTo,
+      travelDate: travelDate || undefined,
+      transferInfo: {
+        mode: transferType,
+        tripType: tfrTripType,
+        goingTo: tfrGoingTo || null,
+        goingFrom: tfrGoingFrom || null,
+        pickupDateTime: tfrPickupDT || null,
+        noOfDays: tfrNoOfDays ? Number(tfrNoOfDays) : null,
+        travelers: tfrTravelers ? Number(tfrTravelers) : null,
+        pickupLocation: tfrPickupLoc || null,
+        preference: tfrPreference || null,
+        leadSource: tfrLeadSource || null,
+        assignToSales: tfrAssignToSales || null,
+        assignToOps: tfrAssignToOps,
+        addRemark: tfrRemark || null,
+      },
+    });
+    if ("data" in result) onSuccess?.();
+  };
+
+  const handleSaveVisa = async () => {
+    const result = await createQuery({
+      lead: leadId,
+      requirementType: "Visa",
+      goingFrom,
+      goingTo,
+      travelDate: travelDate || undefined,
+      visaInfo: {
+        country: vsCountry || null,
+        visaCategory: vsCategory || null,
+        entryType: vsEntryType || null,
+        dateOfTravel: vsDateOfTravel || null,
+        adults: vsAdults ? Number(vsAdults) : null,
+        child: vsChild ? Number(vsChild) : null,
+        childWithFamily: vsChildFamily ? Number(vsChildFamily) : null,
+        infant: vsInfant ? Number(vsInfant) : null,
+        duration: vsDuration || null,
+        nationality: vsNationality,
+        leadSource: vsLeadSource || null,
+        assignToSales: vsAssignToSales || null,
+        assignToOps: vsAssignToOps,
+        addRemark: vsRemark || null,
+      },
+    });
+    if ("data" in result) onSuccess?.();
+  };
+
+  // Hotel / Sightseeing / Miscellaneous handle their own save internally
+  // (they receive leadId + onSuccess as props)
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
       <Card>
@@ -34,22 +236,26 @@ const NewQuery = () => {
               Requirement Type
             </Form.Label>
             <div className="d-flex gap-2 mb-0" style={{ fontSize: "12px" }}>
-              {[
-                "Package",
-                "Flight",
-                "Transfer",
-                "Visa",
-                "Hotel",
-                "Sightseeing",
-                "Miscellaneous",
-              ].map((item) => (
+              {(
+                [
+                  "Package",
+                  "Flight",
+                  "Transfer",
+                  "Visa",
+                  "Hotel",
+                  "Sightseeing",
+                  "Miscellaneous",
+                ] as RequirementType[]
+              ).map((item) => (
                 <Form.Check
                   key={item}
                   type="radio"
                   label={item}
                   value={item}
                   checked={requirementType === item}
-                  onChange={(e) => setRequirementType(e.target.value)}
+                  onChange={(e) =>
+                    setRequirementType(e.target.value as RequirementType)
+                  }
                 />
               ))}
             </div>
@@ -59,24 +265,43 @@ const NewQuery = () => {
         <CardBody className="border">
           <h6 style={{ fontSize: "12px" }}>Lead Info:</h6>
 
+          {/* ── Common header bar ── */}
           <div
             className="d-flex justify-content-between border p-1 mb-2"
             style={{ fontSize: "12px" }}
           >
             <div>
-              <strong>Going From :</strong>
+              <strong>Going From : </strong>
+              <input
+                className="border-0 border-bottom"
+                style={{ fontSize: "12px", width: "100px", outline: "none" }}
+                value={goingFrom}
+                onChange={(e) => setGoingFrom(e.target.value)}
+              />
             </div>
             <div>
-              <strong>Going To :</strong>
+              <strong>Going To : </strong>
+              <input
+                className="border-0 border-bottom"
+                style={{ fontSize: "12px", width: "100px", outline: "none" }}
+                value={goingTo}
+                onChange={(e) => setGoingTo(e.target.value)}
+              />
             </div>
+            <div />
             <div>
-              <strong></strong>
-            </div>
-            <div>
-              <strong>Travel Date:</strong>
-              <strong></strong>
+              <strong>Travel Date: </strong>
+              <input
+                type="date"
+                className="border-0 border-bottom"
+                style={{ fontSize: "12px", outline: "none" }}
+                value={travelDate}
+                onChange={(e) => setTravelDate(e.target.value)}
+              />
             </div>
           </div>
+
+          {/* ── PACKAGE ── */}
           {requirementType === "Package" && (
             <Form>
               <Row className="mb-2">
@@ -87,20 +312,23 @@ const NewQuery = () => {
                   >
                     Query Type
                   </Form.Label>
-                  <div className="d-flex align-iems-center">
+                  <div className="d-flex align-items-center">
                     <Form.Check
                       type="radio"
                       label="FIT (Normal)"
-                      name="type"
+                      name="pkgType"
                       className="me-2"
                       style={{ fontSize: "12px" }}
+                      checked={pkgQueryType === "FIT"}
+                      onChange={() => setPkgQueryType("FIT")}
                     />
-
                     <Form.Check
                       type="radio"
                       label="GIT Group"
-                      name="type"
+                      name="pkgType"
                       style={{ fontSize: "12px" }}
+                      checked={pkgQueryType === "GIT"}
+                      onChange={() => setPkgQueryType("GIT")}
                     />
                   </div>
                 </Col>
@@ -112,9 +340,13 @@ const NewQuery = () => {
                   >
                     Going To
                   </Form.Label>
-                  <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                  <Form.Control
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    value={pkgGoingTo}
+                    onChange={(e) => setPkgGoingTo(e.target.value)}
+                  />
                 </Col>
-
                 <Col md={3}>
                   <Form.Label
                     style={{ fontSize: "10px" }}
@@ -122,7 +354,12 @@ const NewQuery = () => {
                   >
                     Going From
                   </Form.Label>
-                  <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                  <Form.Control
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    value={pkgGoingFrom}
+                    onChange={(e) => setPkgGoingFrom(e.target.value)}
+                  />
                 </Col>
                 <Col md={3}>
                   <Form.Label
@@ -135,6 +372,8 @@ const NewQuery = () => {
                     type="date"
                     size="sm"
                     style={{ fontSize: "12px" }}
+                    value={pkgSpecificDate}
+                    onChange={(e) => setPkgSpecificDate(e.target.value)}
                   />
                 </Col>
                 <Col md={3}>
@@ -144,9 +383,18 @@ const NewQuery = () => {
                   >
                     No of Days
                   </Form.Label>
-                  <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                  <Form.Control
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    value={pkgNoOfDays}
+                    onChange={(e) => setPkgNoOfDays(e.target.value)}
+                  />
                 </Col>
-                <TravelersField />
+
+                <TravelersField
+                  value={pkgTravelers}
+                  onChange={setPkgTravelers}
+                />
 
                 <Col md={3}>
                   <Form.Label
@@ -155,9 +403,13 @@ const NewQuery = () => {
                   >
                     Price Range
                   </Form.Label>
-                  <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                  <Form.Control
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    value={pkgPriceRange}
+                    onChange={(e) => setPkgPriceRange(e.target.value)}
+                  />
                 </Col>
-
                 <Col md={3}>
                   <Form.Label
                     style={{ fontSize: "10px" }}
@@ -165,8 +417,12 @@ const NewQuery = () => {
                   >
                     Inclusions
                   </Form.Label>
-
-                  <Form.Select size="sm" style={{ fontSize: "12px" }}>
+                  <Form.Select
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    value={pkgInclusions}
+                    onChange={(e) => setPkgInclusions(e.target.value)}
+                  >
                     <option value="">Select</option>
                     <option>Hotel</option>
                     <option>Flight</option>
@@ -181,8 +437,12 @@ const NewQuery = () => {
                   >
                     Theme
                   </Form.Label>
-
-                  <Form.Select size="sm" style={{ fontSize: "12px" }}>
+                  <Form.Select
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    value={pkgTheme}
+                    onChange={(e) => setPkgTheme(e.target.value)}
+                  >
                     <option value="">Select</option>
                     <option>Adventure</option>
                     <option>Honeymoon</option>
@@ -196,41 +456,17 @@ const NewQuery = () => {
                     Hotel Preference
                   </Form.Label>
                   <div className="d-flex align-items-center gap-2">
-                    <Form.Check
-                      type="radio"
-                      label="1"
-                      name="preferencce"
-                      className="me-2"
-                      style={{ fontSize: "12px" }}
-                    />
-                    <Form.Check
-                      type="radio"
-                      label="2"
-                      name="preferencce"
-                      defaultChecked
-                      style={{ fontSize: "12px" }}
-                    />
-                    <Form.Check
-                      type="radio"
-                      label="3"
-                      name="preferencce"
-                      defaultChecked
-                      style={{ fontSize: "12px" }}
-                    />
-                    <Form.Check
-                      type="radio"
-                      label="4"
-                      name="preferencce"
-                      defaultChecked
-                      style={{ fontSize: "12px" }}
-                    />
-                    <Form.Check
-                      type="radio"
-                      label="5"
-                      name="preferencce"
-                      defaultChecked
-                      style={{ fontSize: "12px" }}
-                    />
+                    {([1, 2, 3, 4, 5] as const).map((n) => (
+                      <Form.Check
+                        key={n}
+                        type="radio"
+                        label={String(n)}
+                        name="hotelPref"
+                        style={{ fontSize: "12px" }}
+                        checked={pkgHotelPref === n}
+                        onChange={() => setPkgHotelPref(n)}
+                      />
+                    ))}
                   </div>
                 </Col>
                 <Col md={3}>
@@ -244,49 +480,64 @@ const NewQuery = () => {
                     <Form.Check
                       type="checkbox"
                       style={{ fontSize: "12px" }}
-                      onChange={(e) => setShowSelect(e.target.checked)}
+                      checked={pkgAssignToOps}
+                      onChange={(e) => {
+                        setShowSelect(e.target.checked);
+                        setPkgAssignToOps(e.target.checked);
+                      }}
                     />
                     {showSelect && (
                       <Form.Select size="sm" style={{ fontSize: "12px" }}>
                         <option value="">Select</option>
-                        <option>Ops 1</option>
-                        <option>Ops 2</option>
+                        {staffList.map((s: any) => (
+                          <option key={s._id} value={s._id}>
+                            {s.firstName} {s.lastName}
+                          </option>
+                        ))}
                       </Form.Select>
                     )}
                   </div>
                 </Col>
               </Row>
               <div className="text-end mt-3">
-                <Button variant="danger" size="sm" style={{ fontSize: "12px" }}>
-                  Save & Continue
+                <Button
+                  variant="danger"
+                  size="sm"
+                  style={{ fontSize: "12px" }}
+                  disabled={isLoading}
+                  onClick={handleSavePackage}
+                >
+                  {isLoading ? "Saving..." : "Save & Continue"}
                 </Button>
               </div>
             </Form>
           )}
 
+          {/* ── FLIGHT ── */}
           {requirementType === "Flight" && (
             <Form>
               <Row className="mb-2 mt-2">
                 <Col md={6}>
                   <div className="d-flex gap-3 mb-3">
-                    <Form.Check
-                      type="radio"
-                      label="One Way"
-                      name="flightType"
-                      style={{ fontSize: "12px" }}
-                    />
-                    <Form.Check
-                      type="radio"
-                      label="Round Trip"
-                      name="flightType"
-                      style={{ fontSize: "12px" }}
-                    />
-                    <Form.Check
-                      type="radio"
-                      label="Multi City"
-                      name="flightType"
-                      style={{ fontSize: "12px" }}
-                    />
+                    {(["OneWay", "RoundTrip", "MultiCity"] as const).map(
+                      (t) => (
+                        <Form.Check
+                          key={t}
+                          type="radio"
+                          label={
+                            t === "OneWay"
+                              ? "One Way"
+                              : t === "RoundTrip"
+                                ? "Round Trip"
+                                : "Multi City"
+                          }
+                          name="flightType"
+                          style={{ fontSize: "12px" }}
+                          checked={fltTripType === t}
+                          onChange={() => setFltTripType(t)}
+                        />
+                      ),
+                    )}
                   </div>
                 </Col>
                 <Col md={6}>
@@ -295,9 +546,11 @@ const NewQuery = () => {
                     style={{ fontSize: "12px" }}
                     label="Group"
                     className="ms-auto"
+                    checked={fltIsGroup}
+                    onChange={(e) => setFltIsGroup(e.target.checked)}
                   />
                 </Col>
-                {/* Source / Destination */}
+
                 <Row className="mb-2">
                   <Col md={6}>
                     <Form.Label
@@ -306,7 +559,12 @@ const NewQuery = () => {
                     >
                       Select Source City
                     </Form.Label>
-                    <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                    <Form.Control
+                      size="sm"
+                      style={{ fontSize: "12px" }}
+                      value={fltSource}
+                      onChange={(e) => setFltSource(e.target.value)}
+                    />
                   </Col>
                   <Col md={6}>
                     <Form.Label
@@ -315,11 +573,15 @@ const NewQuery = () => {
                     >
                       Select Destination City
                     </Form.Label>
-                    <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                    <Form.Control
+                      size="sm"
+                      style={{ fontSize: "12px" }}
+                      value={fltDest}
+                      onChange={(e) => setFltDest(e.target.value)}
+                    />
                   </Col>
                 </Row>
 
-                {/* Date + Pax */}
                 <Row className="mb-2">
                   <Col md={6}>
                     <Form.Label
@@ -328,9 +590,13 @@ const NewQuery = () => {
                     >
                       Departure Date *
                     </Form.Label>
-                    <Form.Control type="date" size="sm" />
+                    <Form.Control
+                      type="date"
+                      size="sm"
+                      value={fltDepDate}
+                      onChange={(e) => setFltDepDate(e.target.value)}
+                    />
                   </Col>
-
                   <Col md={2}>
                     <Form.Label
                       className="text-primary"
@@ -338,12 +604,16 @@ const NewQuery = () => {
                     >
                       ADULTS (+12 YRS)
                     </Form.Label>
-                    <Form.Select size="sm">
-                      <option>1</option>
-                      <option>2</option>
+                    <Form.Select
+                      size="sm"
+                      value={fltAdults}
+                      onChange={(e) => setFltAdults(Number(e.target.value))}
+                    >
+                      {[1, 2, 3, 4, 5, 6].map((n) => (
+                        <option key={n}>{n}</option>
+                      ))}
                     </Form.Select>
                   </Col>
-
                   <Col md={2}>
                     <Form.Label
                       className="text-primary"
@@ -351,12 +621,16 @@ const NewQuery = () => {
                     >
                       CHILD (2-11 YRS)
                     </Form.Label>
-                    <Form.Select size="sm">
-                      <option>0</option>
-                      <option>1</option>
+                    <Form.Select
+                      size="sm"
+                      value={fltChildren}
+                      onChange={(e) => setFltChildren(Number(e.target.value))}
+                    >
+                      {[0, 1, 2, 3, 4].map((n) => (
+                        <option key={n}>{n}</option>
+                      ))}
                     </Form.Select>
                   </Col>
-
                   <Col md={2}>
                     <Form.Label
                       className="text-primary"
@@ -364,44 +638,51 @@ const NewQuery = () => {
                     >
                       INFANT (0-2 YRS)
                     </Form.Label>
-                    <Form.Select size="sm">
-                      <option>0</option>
-                      <option>1</option>
+                    <Form.Select
+                      size="sm"
+                      value={fltInfants}
+                      onChange={(e) => setFltInfants(Number(e.target.value))}
+                    >
+                      {[0, 1, 2].map((n) => (
+                        <option key={n}>{n}</option>
+                      ))}
                     </Form.Select>
                   </Col>
                 </Row>
 
                 <Row className="mb-2">
                   <Col md={6}>
-                    {/* Fare Type */}
                     <div className="d-flex gap-3 mb-2">
-                      <Form.Check
-                        type="radio"
-                        label="Regular Fares"
-                        name="fareType"
-                        style={{ fontSize: "12px" }}
-                      />
-                      <Form.Check
-                        type="radio"
-                        label="Student Fares"
-                        name="fareType"
-                        style={{ fontSize: "12px" }}
-                      />
-                      <Form.Check
-                        type="radio"
-                        label="Senior Citizen Fares"
-                        name="fareType"
-                        style={{ fontSize: "12px" }}
-                      />
-
+                      {(["Regular", "Student", "SeniorCitizen"] as const).map(
+                        (t) => (
+                          <Form.Check
+                            key={t}
+                            type="radio"
+                            label={
+                              t === "SeniorCitizen"
+                                ? "Senior Citizen Fares"
+                                : `${t} Fares`
+                            }
+                            name="fareType"
+                            style={{ fontSize: "12px" }}
+                            checked={fltFareType === t}
+                            onChange={() => setFltFareType(t)}
+                          />
+                        ),
+                      )}
                       <Form.Check
                         type="checkbox"
                         style={{ fontSize: "12px" }}
                         label="Direct Flight"
+                        checked={fltFareType === "Direct"}
+                        onChange={(e) =>
+                          setFltFareType(
+                            e.target.checked ? "Direct" : "Regular",
+                          )
+                        }
                       />
                     </div>
                   </Col>
-
                   <Col md={2}>
                     <Form.Label
                       className="text-primary"
@@ -409,12 +690,18 @@ const NewQuery = () => {
                     >
                       Class
                     </Form.Label>
-                    <Form.Select size="sm" style={{ fontSize: "12px" }}>
-                      <option>Economy</option>
-                      <option>Business</option>
+                    <Form.Select
+                      size="sm"
+                      style={{ fontSize: "12px" }}
+                      value={fltClass}
+                      onChange={(e) => setFltClass(e.target.value as any)}
+                    >
+                      <option value="Economy">Economy</option>
+                      <option value="Business">Business</option>
+                      <option value="First">First</option>
+                      <option value="PremiumEconomy">Premium Economy</option>
                     </Form.Select>
                   </Col>
-
                   <Col md={2}>
                     <Form.Label
                       className="text-primary"
@@ -422,13 +709,17 @@ const NewQuery = () => {
                     >
                       Preferred Airline
                     </Form.Label>
-                    <Form.Select size="sm" style={{ fontSize: "12px" }}>
-                      <option>None selected</option>
+                    <Form.Select
+                      size="sm"
+                      style={{ fontSize: "12px" }}
+                      value={fltAirline}
+                      onChange={(e) => setFltAirline(e.target.value)}
+                    >
+                      <option value="">None selected</option>
                       <option>Indigo</option>
                       <option>Air India</option>
                     </Form.Select>
                   </Col>
-
                   <Col md={2}>
                     <Form.Label
                       className="text-primary"
@@ -436,12 +727,22 @@ const NewQuery = () => {
                     >
                       Lead Source
                     </Form.Label>
-                    <Form.Select size="sm" style={{ fontSize: "12px" }}>
-                      <option>RAJ SIR</option>
+                    <Form.Select
+                      size="sm"
+                      style={{ fontSize: "12px" }}
+                      value={fltLeadSource}
+                      onChange={(e) => setFltLeadSource(e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      {staffList.map((s: any) => (
+                        <option key={s._id} value={s._id}>
+                          {s.firstName} {s.lastName}
+                        </option>
+                      ))}
                     </Form.Select>
                   </Col>
                 </Row>
-                {/* Assign + Remark */}
+
                 <Row className="mb-2">
                   <Col md={3}>
                     <Form.Label
@@ -450,11 +751,20 @@ const NewQuery = () => {
                     >
                       Assign To Sales
                     </Form.Label>
-                    <Form.Select size="sm" style={{ fontSize: "12px" }}>
-                      <option>Self</option>
+                    <Form.Select
+                      size="sm"
+                      style={{ fontSize: "12px" }}
+                      value={fltAssignToSales}
+                      onChange={(e) => setFltAssignToSales(e.target.value)}
+                    >
+                      <option value="">Self</option>
+                      {staffList.map((s: any) => (
+                        <option key={s._id} value={s._id}>
+                          {s.firstName} {s.lastName}
+                        </option>
+                      ))}
                     </Form.Select>
                   </Col>
-
                   <Col md={3}>
                     <Form.Label
                       style={{ fontSize: "10px" }}
@@ -466,18 +776,24 @@ const NewQuery = () => {
                       <Form.Check
                         type="checkbox"
                         style={{ fontSize: "12px" }}
-                        onChange={(e) => setShowSelect(e.target.checked)}
+                        checked={fltAssignToOps}
+                        onChange={(e) => {
+                          setShowSelect(e.target.checked);
+                          setFltAssignToOps(e.target.checked);
+                        }}
                       />
                       {showSelect && (
                         <Form.Select size="sm">
-                          <option>Select</option>
-                          <option>Ops 1</option>
-                          <option>Ops 2</option>
+                          <option value="">Select</option>
+                          {staffList.map((s: any) => (
+                            <option key={s._id} value={s._id}>
+                              {s.firstName} {s.lastName}
+                            </option>
+                          ))}
                         </Form.Select>
                       )}
                     </div>
                   </Col>
-
                   <Col md={4}>
                     <Form.Label
                       className="text-primary"
@@ -485,38 +801,52 @@ const NewQuery = () => {
                     >
                       Add Remark
                     </Form.Label>
-                    <Form.Control as="textarea" rows={1} size="sm" />
+                    <Form.Control
+                      as="textarea"
+                      rows={1}
+                      size="sm"
+                      value={fltRemark}
+                      onChange={(e) => setFltRemark(e.target.value)}
+                    />
                   </Col>
                 </Row>
 
-                {/* Button */}
                 <div className="text-end">
-                  <Button variant="danger" size="sm">
-                    Save & Continue
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={isLoading}
+                    onClick={handleSaveFlight}
+                  >
+                    {isLoading ? "Saving..." : "Save & Continue"}
                   </Button>
                 </div>
               </Row>
             </Form>
           )}
 
+          {/* ── TRANSFER ── */}
           {requirementType === "Transfer" && (
             <Form>
               <Row className="mb-2 mt-2">
                 <Col md={6}>
                   <div className="d-flex gap-3 mb-3">
-                    {["Cab", "Train"].map((item) => (
+                    {(["Cab", "Train"] as const).map((item) => (
                       <Form.Check
                         key={item}
                         type="radio"
                         label={item}
                         value={item}
                         checked={transferType === item}
-                        onChange={(e) => settransferType(e.target.value)}
+                        onChange={(e) =>
+                          setTransferType(e.target.value as "Cab" | "Train")
+                        }
                       />
                     ))}
                   </div>
                 </Col>
 
+                {/* ── CAB ── */}
                 {transferType === "Cab" && (
                   <div>
                     <Row>
@@ -527,24 +857,26 @@ const NewQuery = () => {
                         >
                           Query Type
                         </Form.Label>
-                        <div className="d-flex align-iems-center">
+                        <div className="d-flex align-items-center">
                           <Form.Check
                             type="radio"
                             label="One Way"
-                            name="type"
+                            name="tfrType"
                             className="me-2"
                             style={{ fontSize: "12px" }}
+                            checked={tfrTripType === "OneWay"}
+                            onChange={() => setTfrTripType("OneWay")}
                           />
-
                           <Form.Check
                             type="radio"
                             label="Round Trip"
-                            name="type"
+                            name="tfrType"
                             style={{ fontSize: "12px" }}
+                            checked={tfrTripType === "RoundTrip"}
+                            onChange={() => setTfrTripType("RoundTrip")}
                           />
                         </div>
                       </Col>
-
                       <Col md={3}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
@@ -552,9 +884,13 @@ const NewQuery = () => {
                         >
                           Going To
                         </Form.Label>
-                        <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                        <Form.Control
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrGoingTo}
+                          onChange={(e) => setTfrGoingTo(e.target.value)}
+                        />
                       </Col>
-
                       <Col md={3}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
@@ -562,19 +898,26 @@ const NewQuery = () => {
                         >
                           Going From
                         </Form.Label>
-                        <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                        <Form.Control
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrGoingFrom}
+                          onChange={(e) => setTfrGoingFrom(e.target.value)}
+                        />
                       </Col>
                       <Col md={3}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
                           className="text-primary"
                         >
-                          Pickup up & Date Time
+                          Pickup & Date Time
                         </Form.Label>
                         <Form.Control
                           type="date"
                           size="sm"
                           style={{ fontSize: "12px" }}
+                          value={tfrPickupDT}
+                          onChange={(e) => setTfrPickupDT(e.target.value)}
                         />
                       </Col>
                       <Col md={3}>
@@ -584,10 +927,17 @@ const NewQuery = () => {
                         >
                           No of Days
                         </Form.Label>
-                        <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                        <Form.Control
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrNoOfDays}
+                          onChange={(e) => setTfrNoOfDays(e.target.value)}
+                        />
                       </Col>
-                      <TravelersField />
-
+                      <TravelersField
+                        value={tfrTravelers}
+                        onChange={setTfrTravelers}
+                      />
                       <Col md={3}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
@@ -595,9 +945,13 @@ const NewQuery = () => {
                         >
                           Travelers
                         </Form.Label>
-                        <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                        <Form.Control
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrTravelers}
+                          onChange={(e) => setTfrTravelers(e.target.value)}
+                        />
                       </Col>
-
                       <Col md={3}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
@@ -605,9 +959,13 @@ const NewQuery = () => {
                         >
                           Pickup Location
                         </Form.Label>
-                        <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                        <Form.Control
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrPickupLoc}
+                          onChange={(e) => setTfrPickupLoc(e.target.value)}
+                        />
                       </Col>
-
                       <Col md={3}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
@@ -615,10 +973,14 @@ const NewQuery = () => {
                         >
                           Preference
                         </Form.Label>
-
-                        <Form.Select size="sm" style={{ fontSize: "12px" }}>
+                        <Form.Select
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrPreference}
+                          onChange={(e) => setTfrPreference(e.target.value)}
+                        >
                           <option value="">Select</option>
-                          <option>Luxary</option>
+                          <option>Luxury</option>
                           <option>Standard</option>
                           <option>SUV</option>
                         </Form.Select>
@@ -630,15 +992,18 @@ const NewQuery = () => {
                         >
                           Lead Source
                         </Form.Label>
-
-                        <Form.Select size="sm" style={{ fontSize: "12px" }}>
+                        <Form.Select
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrLeadSource}
+                          onChange={(e) => setTfrLeadSource(e.target.value)}
+                        >
                           <option value="">Select</option>
                           <option>Agency</option>
                           <option>Website</option>
                           <option>Facebook</option>
                         </Form.Select>
                       </Col>
-
                       <Col md={3}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
@@ -646,21 +1011,32 @@ const NewQuery = () => {
                         >
                           Add Remark
                         </Form.Label>
-                        <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                        <Form.Control
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrRemark}
+                          onChange={(e) => setTfrRemark(e.target.value)}
+                        />
                       </Col>
-
                       <Col md={3}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
                           className="text-primary"
                         >
-                          Assign to sales
+                          Assign to Sales
                         </Form.Label>
-                        <Form.Select size="sm" style={{ fontSize: "12px" }}>
-                          <option value="">Select</option>
-                          <option>Self</option>
-                          <option>Rajendra Bugade</option>
-                          <option>Facebook</option>
+                        <Form.Select
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrAssignToSales}
+                          onChange={(e) => setTfrAssignToSales(e.target.value)}
+                        >
+                          <option value="">Self</option>
+                          {staffList.map((s: any) => (
+                            <option key={s._id} value={s._id}>
+                              {s.firstName} {s.lastName}
+                            </option>
+                          ))}
                         </Form.Select>
                       </Col>
                       <Col md={3}>
@@ -674,25 +1050,39 @@ const NewQuery = () => {
                           <Form.Check
                             type="checkbox"
                             style={{ fontSize: "12px" }}
-                            onChange={(e) => setShowSelect(e.target.checked)}
+                            checked={tfrAssignToOps}
+                            onChange={(e) => {
+                              setShowSelect(e.target.checked);
+                              setTfrAssignToOps(e.target.checked);
+                            }}
                           />
                           {showSelect && (
                             <Form.Select size="sm" style={{ fontSize: "12px" }}>
                               <option value="">Select</option>
-                              <option>Ops 1</option>
-                              <option>Ops 2</option>
+                              {staffList.map((s: any) => (
+                                <option key={s._id} value={s._id}>
+                                  {s.firstName} {s.lastName}
+                                </option>
+                              ))}
                             </Form.Select>
                           )}
                         </div>
                       </Col>
                     </Row>
                     <div className="text-end mt-2">
-                      <Button variant="danger" size="sm">
-                        Save & Continue
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={isLoading}
+                        onClick={handleSaveTransfer}
+                      >
+                        {isLoading ? "Saving..." : "Save & Continue"}
                       </Button>
                     </div>
                   </div>
                 )}
+
+                {/* ── TRAIN (uses same transferInfo, mode=Train) ── */}
                 {transferType === "Train" && (
                   <div>
                     <Row>
@@ -703,24 +1093,26 @@ const NewQuery = () => {
                         >
                           Query Type
                         </Form.Label>
-                        <div className="d-flex align-iems-center">
+                        <div className="d-flex align-items-center">
                           <Form.Check
                             type="radio"
                             label="One Way"
-                            name="type"
+                            name="tfrTrainType"
                             className="me-2"
                             style={{ fontSize: "12px" }}
+                            checked={tfrTripType === "OneWay"}
+                            onChange={() => setTfrTripType("OneWay")}
                           />
-
                           <Form.Check
                             type="radio"
                             label="Round Trip"
-                            name="type"
+                            name="tfrTrainType"
                             style={{ fontSize: "12px" }}
+                            checked={tfrTripType === "RoundTrip"}
+                            onChange={() => setTfrTripType("RoundTrip")}
                           />
                         </div>
                       </Col>
-
                       <Col md={4}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
@@ -728,9 +1120,13 @@ const NewQuery = () => {
                         >
                           From
                         </Form.Label>
-                        <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                        <Form.Control
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrGoingFrom}
+                          onChange={(e) => setTfrGoingFrom(e.target.value)}
+                        />
                       </Col>
-
                       <Col md={4}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
@@ -738,7 +1134,12 @@ const NewQuery = () => {
                         >
                           To
                         </Form.Label>
-                        <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                        <Form.Control
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrGoingTo}
+                          onChange={(e) => setTfrGoingTo(e.target.value)}
+                        />
                       </Col>
                       <Col md={4}>
                         <Form.Label
@@ -751,13 +1152,14 @@ const NewQuery = () => {
                           type="date"
                           size="sm"
                           style={{ fontSize: "12px" }}
+                          value={tfrPickupDT}
+                          onChange={(e) => setTfrPickupDT(e.target.value)}
                         />
                       </Col>
                       <Col md={4}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
                           className="text-primary"
-                          size="sm"
                         >
                           ADULTS (+12 YEARS)
                         </Form.Label>
@@ -770,7 +1172,6 @@ const NewQuery = () => {
                         <Form.Label
                           style={{ fontSize: "10px" }}
                           className="text-primary"
-                          size="sm"
                         >
                           CHILD (2-11 YEARS)
                         </Form.Label>
@@ -780,12 +1181,10 @@ const NewQuery = () => {
                           <option>3</option>
                         </Form.Select>
                       </Col>
-
                       <Col md={4}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
                           className="text-primary"
-                          size="sm"
                         >
                           INFANT (0-2 YEARS)
                         </Form.Label>
@@ -795,12 +1194,10 @@ const NewQuery = () => {
                           <option>3</option>
                         </Form.Select>
                       </Col>
-
                       <Col md={4}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
                           className="text-primary"
-                          size="sm"
                         >
                           CLASSES
                         </Form.Label>
@@ -809,12 +1206,10 @@ const NewQuery = () => {
                           <option>ALL CLASSES</option>
                         </Form.Select>
                       </Col>
-
                       <Col md={4}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
                           className="text-primary"
-                          size="sm"
                         >
                           Category
                         </Form.Label>
@@ -823,19 +1218,25 @@ const NewQuery = () => {
                           <option>Tatkal</option>
                         </Form.Select>
                       </Col>
-
                       <Col md={4}>
                         <Form.Label
                           style={{ fontSize: "10px" }}
                           className="text-primary"
                         >
-                          Assign to sales
+                          Assign to Sales
                         </Form.Label>
-                        <Form.Select size="sm" style={{ fontSize: "12px" }}>
-                          <option value="">Select</option>
-                          <option>Self</option>
-                          <option>Rajendra Bugade</option>
-                          <option>Facebook</option>
+                        <Form.Select
+                          size="sm"
+                          style={{ fontSize: "12px" }}
+                          value={tfrAssignToSales}
+                          onChange={(e) => setTfrAssignToSales(e.target.value)}
+                        >
+                          <option value="">Self</option>
+                          {staffList.map((s: any) => (
+                            <option key={s._id} value={s._id}>
+                              {s.firstName} {s.lastName}
+                            </option>
+                          ))}
                         </Form.Select>
                       </Col>
                       <Col md={4}>
@@ -849,21 +1250,33 @@ const NewQuery = () => {
                           <Form.Check
                             type="checkbox"
                             style={{ fontSize: "12px" }}
-                            onChange={(e) => setShowSelect(e.target.checked)}
+                            checked={tfrAssignToOps}
+                            onChange={(e) => {
+                              setShowSelect(e.target.checked);
+                              setTfrAssignToOps(e.target.checked);
+                            }}
                           />
                           {showSelect && (
                             <Form.Select size="sm" style={{ fontSize: "12px" }}>
                               <option value="">Select</option>
-                              <option>Ops 1</option>
-                              <option>Ops 2</option>
+                              {staffList.map((s: any) => (
+                                <option key={s._id} value={s._id}>
+                                  {s.firstName} {s.lastName}
+                                </option>
+                              ))}
                             </Form.Select>
                           )}
                         </div>
                       </Col>
                     </Row>
                     <div className="text-end">
-                      <Button variant="danger" size="sm">
-                        Save & Continue
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={isLoading}
+                        onClick={handleSaveTransfer}
+                      >
+                        {isLoading ? "Saving..." : "Save & Continue"}
                       </Button>
                     </div>
                   </div>
@@ -872,6 +1285,7 @@ const NewQuery = () => {
             </Form>
           )}
 
+          {/* ── VISA ── */}
           {requirementType === "Visa" && (
             <Form>
               <Row className="mt-2">
@@ -882,9 +1296,13 @@ const NewQuery = () => {
                   >
                     Country *
                   </Form.Label>
-                  <Form.Control size="sm" style={{ fontSize: "12px" }} />
+                  <Form.Control
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    value={vsCountry}
+                    onChange={(e) => setVsCountry(e.target.value)}
+                  />
                 </Col>
-
                 <Col md={3}>
                   <Form.Label
                     className="text-primary"
@@ -892,14 +1310,18 @@ const NewQuery = () => {
                   >
                     Visa Category *
                   </Form.Label>
-                  <Form.Select size="sm" style={{ fontSize: "12px" }}>
-                    <option>Select</option>
+                  <Form.Select
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    value={vsCategory}
+                    onChange={(e) => setVsCategory(e.target.value)}
+                  >
+                    <option value="">Select</option>
                     <option>Tourism</option>
                     <option>Business</option>
                     <option>Student</option>
                   </Form.Select>
                 </Col>
-
                 <Col md={3}>
                   <Form.Label
                     className="text-primary"
@@ -907,14 +1329,18 @@ const NewQuery = () => {
                   >
                     Entry Type
                   </Form.Label>
-                  <Form.Select size="sm" style={{ fontSize: "12px" }}>
-                    <option>Select</option>
+                  <Form.Select
+                    size="sm"
+                    style={{ fontSize: "12px" }}
+                    value={vsEntryType}
+                    onChange={(e) => setVsEntryType(e.target.value)}
+                  >
+                    <option value="">Select</option>
                     <option>Single Entry</option>
                     <option>Multi Entry</option>
                     <option>Double Entry</option>
                   </Form.Select>
                 </Col>
-
                 <Col md={3}>
                   <Form.Label
                     className="text-primary"
@@ -926,10 +1352,10 @@ const NewQuery = () => {
                     type="date"
                     size="sm"
                     style={{ fontSize: "12px" }}
+                    value={vsDateOfTravel}
+                    onChange={(e) => setVsDateOfTravel(e.target.value)}
                   />
                 </Col>
-
-                {/* Row 2 */}
                 <Col md={2}>
                   <Form.Label
                     className="text-primary"
@@ -937,9 +1363,12 @@ const NewQuery = () => {
                   >
                     Adult
                   </Form.Label>
-                  <Form.Control size="sm" />
+                  <Form.Control
+                    size="sm"
+                    value={vsAdults}
+                    onChange={(e) => setVsAdults(e.target.value)}
+                  />
                 </Col>
-
                 <Col md={2}>
                   <Form.Label
                     className="text-primary"
@@ -947,9 +1376,12 @@ const NewQuery = () => {
                   >
                     Child
                   </Form.Label>
-                  <Form.Control size="sm" />
+                  <Form.Control
+                    size="sm"
+                    value={vsChild}
+                    onChange={(e) => setVsChild(e.target.value)}
+                  />
                 </Col>
-
                 <Col md={2}>
                   <Form.Label
                     className="text-primary"
@@ -957,9 +1389,12 @@ const NewQuery = () => {
                   >
                     Child With Family
                   </Form.Label>
-                  <Form.Control size="sm" />
+                  <Form.Control
+                    size="sm"
+                    value={vsChildFamily}
+                    onChange={(e) => setVsChildFamily(e.target.value)}
+                  />
                 </Col>
-
                 <Col md={2}>
                   <Form.Label
                     className="text-primary"
@@ -967,9 +1402,12 @@ const NewQuery = () => {
                   >
                     Infant
                   </Form.Label>
-                  <Form.Control size="sm" />
+                  <Form.Control
+                    size="sm"
+                    value={vsInfant}
+                    onChange={(e) => setVsInfant(e.target.value)}
+                  />
                 </Col>
-
                 <Col md={2}>
                   <Form.Label
                     className="text-primary"
@@ -977,9 +1415,12 @@ const NewQuery = () => {
                   >
                     Duration
                   </Form.Label>
-                  <Form.Control size="sm" />
+                  <Form.Control
+                    size="sm"
+                    value={vsDuration}
+                    onChange={(e) => setVsDuration(e.target.value)}
+                  />
                 </Col>
-
                 <Col md={2}>
                   <Form.Label
                     className="text-primary"
@@ -987,12 +1428,14 @@ const NewQuery = () => {
                   >
                     Nationality *
                   </Form.Label>
-                  <Form.Select size="sm">
+                  <Form.Select
+                    size="sm"
+                    value={vsNationality}
+                    onChange={(e) => setVsNationality(e.target.value)}
+                  >
                     <option>India</option>
                   </Form.Select>
                 </Col>
-
-                {/* Row 3 */}
                 <Col md={3}>
                   <Form.Label
                     className="text-primary"
@@ -1000,13 +1443,16 @@ const NewQuery = () => {
                   >
                     Lead Source *
                   </Form.Label>
-                  <Form.Select size="sm">
-                    <option>Select</option>
+                  <Form.Select
+                    size="sm"
+                    value={vsLeadSource}
+                    onChange={(e) => setVsLeadSource(e.target.value)}
+                  >
+                    <option value="">Select</option>
                     <option>Website</option>
                     <option>Agency</option>
                   </Form.Select>
                 </Col>
-
                 <Col md={3}>
                   <Form.Label
                     className="text-primary"
@@ -1014,10 +1460,14 @@ const NewQuery = () => {
                   >
                     Add Remark
                   </Form.Label>
-                  <Form.Control as="textarea" rows={1} size="sm" />
+                  <Form.Control
+                    as="textarea"
+                    rows={1}
+                    size="sm"
+                    value={vsRemark}
+                    onChange={(e) => setVsRemark(e.target.value)}
+                  />
                 </Col>
-
-                {/* Row 4 */}
                 <Col md={3}>
                   <Form.Label
                     className="text-primary"
@@ -1025,11 +1475,19 @@ const NewQuery = () => {
                   >
                     Assign To Sales
                   </Form.Label>
-                  <Form.Select size="sm">
-                    <option>Self</option>
+                  <Form.Select
+                    size="sm"
+                    value={vsAssignToSales}
+                    onChange={(e) => setVsAssignToSales(e.target.value)}
+                  >
+                    <option value="">Self</option>
+                    {staffList.map((s: any) => (
+                      <option key={s._id} value={s._id}>
+                        {s.firstName} {s.lastName}
+                      </option>
+                    ))}
                   </Form.Select>
                 </Col>
-
                 <Col md={3}>
                   <Form.Label
                     className="text-primary"
@@ -1037,37 +1495,55 @@ const NewQuery = () => {
                   >
                     Assign To Ops
                   </Form.Label>
-
                   <div className="d-flex align-items-center gap-2">
                     <Form.Check
                       type="checkbox"
-                      onChange={(e) => setShowSelect(e.target.checked)}
+                      checked={vsAssignToOps}
+                      onChange={(e) => {
+                        setShowSelect(e.target.checked);
+                        setVsAssignToOps(e.target.checked);
+                      }}
                     />
-
                     {showSelect && (
                       <Form.Select size="sm">
-                        <option>Select</option>
-                        <option>Ops 1</option>
-                        <option>Ops 2</option>
+                        <option value="">Select</option>
+                        {staffList.map((s: any) => (
+                          <option key={s._id} value={s._id}>
+                            {s.firstName} {s.lastName}
+                          </option>
+                        ))}
                       </Form.Select>
                     )}
                   </div>
                 </Col>
                 <div className="text-end mt-2">
-                  <Button variant="danger" size="sm">
-                    Save Query
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={isLoading}
+                    onClick={handleSaveVisa}
+                  >
+                    {isLoading ? "Saving..." : "Save Query"}
                   </Button>
                 </div>
               </Row>
             </Form>
           )}
 
-          {requirementType === "Hotel" && <Hotel />}
-          {requirementType === "Sightseeing" && <Sightseeing />}
-          {requirementType === "Miscellaneous" && <Miscellaneous />}
+          {/* Hotel / Sightseeing / Miscellaneous — pass leadId + onSuccess down */}
+          {requirementType === "Hotel" && (
+            <Hotel leadId={leadId} onSuccess={onSuccess} />
+          )}
+          {requirementType === "Sightseeing" && (
+            <Sightseeing leadId={leadId} onSuccess={onSuccess} />
+          )}
+          {requirementType === "Miscellaneous" && (
+            <Miscellaneous leadId={leadId} onSuccess={onSuccess} />
+          )}
         </CardBody>
       </Card>
     </>
   );
 };
+
 export default NewQuery;
